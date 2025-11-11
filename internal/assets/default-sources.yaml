@@ -1,0 +1,125 @@
+$schema: https://raw.githubusercontent.com/viktorprogger/universal-linux-installer/HEAD/schema/unilin.schema.json
+
+# Default popular package manager sources for unilin
+# You can copy snippets from here into your ~/.config/unilin/config.yaml
+
+sources:
+  - type: package_manager
+    name: apt
+    install:
+      command: "apt install -y {package_list}"
+      require_root: true
+    remove:
+      command: "apt remove -y {package_list}"
+      require_root: true
+    update:
+      command: "apt install --only-upgrade -y {package_list}"
+      require_root: true
+    search:
+      command: "apt search {query}"
+      require_root: false
+
+  - type: package_manager
+    name: dnf
+    install:
+      command: "dnf install -y {package_list}"
+      require_root: true
+    remove:
+      command: "dnf remove -y {package_list}"
+      require_root: true
+    update:
+      command: "dnf upgrade -y {package_list}"
+      require_root: true
+    search:
+      command: "dnf search {query}"
+      require_root: false
+
+  - type: package_manager
+    name: pacman
+    install:
+      command: "pacman -S --noconfirm {package_list}"
+      require_root: true
+    remove:
+      command: "pacman -Rns --noconfirm {package_list}"
+      require_root: true
+    update:
+      command: "pacman -S --noconfirm {package_list}"
+      require_root: true
+    search:
+      command: "pacman -Ss {query}"
+      require_root: false
+
+  - type: package_manager
+    name: zypper
+    install:
+      command: "zypper install -y {package_list}"
+      require_root: true
+    remove:
+      command: "zypper remove -y {package_list}"
+      require_root: true
+    update:
+      command: "zypper update -y {package_list}"
+      require_root: true
+    search:
+      command: "zypper search {query}"
+      require_root: false
+
+  - type: package_manager
+    name: apk
+    install:
+      command: "apk add {package_list}"
+      require_root: true
+    remove:
+      command: "apk del {package_list}"
+      require_root: true
+    update:
+      command: "apk add -u {package_list}"
+      require_root: true
+    search:
+      command: "apk search {query}"
+      require_root: false
+
+  - type: package_manager
+    name: snap
+    install:
+      command: "snap install {package_list}"
+      require_root: true
+    remove:
+      command: "snap remove {package_list}"
+      require_root: true
+    update:
+      command: "snap refresh {package_list}"
+      require_root: true
+    search:
+      command: "snap find {query}"
+      require_root: false
+
+  - type: package_manager
+    name: flatpak
+    install:
+      command: "flatpak install -y {package_list}"
+      require_root: false
+    remove:
+      command: "flatpak uninstall -y {package_list}"
+      require_root: false
+    update:
+      command: "flatpak update -y {package_list}"
+      require_root: false
+    search:
+      command: "flatpak search {query}"
+      require_root: false
+
+  - type: package_manager
+    name: brew
+    install:
+      command: "brew install {package_list}"
+      require_root: false
+    remove:
+      command: "brew uninstall {package_list}"
+      require_root: false
+    update:
+      command: "brew upgrade {package_list}"
+      require_root: false
+    search:
+      command: "brew search {query}"
+      require_root: false

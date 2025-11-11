@@ -1,0 +1,128 @@
+name: Release builds
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and upload release artifacts
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: linux
+            goarch: arm
+            arm_suffix: v7
+          - goos: linux
+            goarch: '386'
+          - goos: linux
+            goarch: riscv64
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+          - goos: windows
+            goarch: arm64
+            ext: .exe
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Go env
+        run: |
+          go env
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build
+        id: build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          BIN_NAME="unilin"
+          OUT_DIR="dist"
+          mkdir -p "$OUT_DIR"
+
+          # Configure GOARM for arm builds
+          ARM_SUFFIX=""
+          if [ "$GOARCH" = "arm" ]; then
+            export GOARM=7
+            ARM_SUFFIX="${{ matrix.arm_suffix }}"
+          fi
+
+          # Filename suffix
+          SUFFIX="${GOOS}_${GOARCH}${ARM_SUFFIX:+_${ARM_SUFFIX}}"
+          OUT_BIN="${OUT_DIR}/${BIN_NAME}_${SUFFIX}${{ matrix.ext }}"
+
+          echo "Building ${OUT_BIN}"
+          go build -trimpath -ldflags "-s -w -X github.com/viktorprogger/universal-linux-installer/cmd.version=${VERSION}" -o "$OUT_BIN" ./
+
+          # For Linux, create tar.gz with README and LICENSE
+          # For Windows and macOS, create zip with README and LICENSE
+          if [ "$GOOS" = "linux" ]; then
+            TAR_NAME="${BIN_NAME}_${SUFFIX}.tar.gz"
+            tar -czf "${OUT_DIR}/${TAR_NAME}" -C "$OUT_DIR" "$(basename "$OUT_BIN")" README.md LICENSE || tar -czf "${OUT_DIR}/${TAR_NAME}" -C "$OUT_DIR" "$(basename "$OUT_BIN")" README.md || tar -czf "${OUT_DIR}/${TAR_NAME}" -C "$OUT_DIR" "$(basename "$OUT_BIN")"
+            echo "archive=${OUT_DIR}/${TAR_NAME}" >> $GITHUB_OUTPUT
+          else
+            ZIP_NAME="${BIN_NAME}_${SUFFIX}.zip"
+            cd "$OUT_DIR"
+            zip -q "${ZIP_NAME}" "$(basename "$OUT_BIN")" README.md LICENSE || zip -q "${ZIP_NAME}" "$(basename "$OUT_BIN")" README.md || zip -q "${ZIP_NAME}" "$(basename "$OUT_BIN")"
+            cd - > /dev/null
+            echo "archive=${OUT_DIR}/${ZIP_NAME}" >> $GITHUB_OUTPUT
+          fi
+
+          echo "binary=${OUT_BIN}" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact (CI visibility)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.archive }}
+          path: ${{ steps.build.outputs.archive }}
+          if-no-files-found: error
+
+      - name: Upload binary artifact (CI visibility)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.binary }}
+          path: ${{ steps.build.outputs.binary }}
+          if-no-files-found: error
+
+      - name: Generate checksums
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          (cd dist && sha256sum *.tar.gz *.zip) > dist/checksums.txt
+
+      - name: Upload release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.exe
+            dist/checksums.txt
+          fail_on_unmatched_files: true

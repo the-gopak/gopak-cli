@@ -1,0 +1,79 @@
+{
+  "$id": "https://raw.githubusercontent.com/viktorprogger/universal-linux-installer/HEAD/schema/unilin.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "unilin configuration",
+  "type": "object",
+  "properties": {
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "name": { "type": "string" },
+          "install": { "$ref": "#/definitions/command" },
+          "remove": { "$ref": "#/definitions/command" },
+          "update": { "$ref": "#/definitions/command" },
+          "search": { "$ref": "#/definitions/command" },
+          "outdated": { "$ref": "#/definitions/command" }
+        },
+        "required": ["type", "name"],
+        "additionalProperties": false
+      }
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "source": { "type": "string" },
+          "depends_on": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["name", "source"],
+        "additionalProperties": false
+      }
+    },
+    "custom_packages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "depends_on": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "get_latest_version": { "$ref": "#/definitions/command" },
+          "get_installed_version": { "$ref": "#/definitions/command" },
+          "compare_versions": { "$ref": "#/definitions/command" },
+          "download": { "$ref": "#/definitions/command" },
+          "remove": { "$ref": "#/definitions/command" },
+          "install": { "$ref": "#/definitions/command" }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "command": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "properties": {
+            "command": { "type": "string" },
+            "require_root": { "type": "boolean", "default": false }
+          },
+          "required": ["command"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

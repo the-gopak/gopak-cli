@@ -1,0 +1,35 @@
+# Build artifacts
+/dist/
+/build/
+/bin/
+
+# Local binaries
+universal-linux-installer
+unilin
+
+# Test/coverage outputs
+coverage.out
+cover*.out
+
+# OS/editor junk
+.DS_Store
+.idea/
+.vscode/
+.fleet/
+
+# Caches/temp
+.tmp/
+.tmp/**
+.cache/
+**/.history/
+
+# Logs and archives
+*.log
+*.tar.gz
+
+# Go workspace files (local only)
+go.work
+go.work.sum
+
+# Environment files
+.env
