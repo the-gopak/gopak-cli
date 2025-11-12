@@ -14,7 +14,7 @@ import (
 type pkgKey struct {
 	Source string
 	Name   string
-	Kind   string 
+	Kind   string
 }
 
 type pkgStatus struct {
@@ -37,13 +37,13 @@ func (m *Manager) UpdateAll(ctx context.Context, r UpdateReporter, runner Runner
 			wg.Add(1)
 			go func(k pkgKey) {
 				defer wg.Done()
-				inst := m.getInstalled(k)
+				inst := m.getVersionInstalled(k)
 				mu.Lock()
 				s := status[k]
 				s.Installed = inst
 				status[k] = s
 				mu.Unlock()
-				r.OnInstalled(PackageKey{Source: k.Source, Name: k.Name, Kind: k.Kind}, inst)
+				r.OnInstalled(PackageKey(k), inst)
 			}(k)
 		}
 	}
@@ -55,13 +55,13 @@ func (m *Manager) UpdateAll(ctx context.Context, r UpdateReporter, runner Runner
 		wg.Add(1)
 		go func(k pkgKey) {
 			defer wg.Done()
-			avail := m.getAvailable(k)
+			avail := m.getVersionAvailable(k)
 			mu.Lock()
 			s := status[k]
 			s.Available = avail
 			status[k] = s
 			mu.Unlock()
-			r.OnAvailable(PackageKey{Source: k.Source, Name: k.Name, Kind: k.Kind}, avail)
+			r.OnAvailable(PackageKey(k), avail)
 		}(k)
 	}
 	wg.Wait()
@@ -75,11 +75,14 @@ func (m *Manager) UpdateAll(ctx context.Context, r UpdateReporter, runner Runner
 	r.OnUpdateStart()
 	var runWg sync.WaitGroup
 	for src, names := range m.groupSourcesOnly() {
-		src := src
 		names := append([]string{}, names...)
 		s := m.sourceByName(src)
-		if len(names) == 0 || s.Name == "" { continue }
-		if s.Update.Command == "" { return fmt.Errorf("missing update command for source: %s", src) }
+		if len(names) == 0 || s.Name == "" {
+			continue
+		}
+		if s.Update.Command == "" {
+			return fmt.Errorf("missing update command for source: %s", src)
+		}
 		runWg.Add(1)
 		go func() {
 			defer runWg.Done()
@@ -88,7 +91,9 @@ func (m *Manager) UpdateAll(ctx context.Context, r UpdateReporter, runner Runner
 			for _, n := range names {
 				ok := err == nil
 				msg := ""
-				if err != nil { msg = err.Error() }
+				if err != nil {
+					msg = err.Error()
+				}
 				r.OnPackageUpdated(PackageKey{Source: src, Name: n, Kind: kindOf(src)}, ok, msg)
 			}
 		}()
@@ -115,7 +120,9 @@ func (m *Manager) groupSourcesOnly() map[string][]string {
 }
 
 func kindOf(group string) string {
-	if group == "custom" { return "custom" }
+	if group == "custom" {
+		return "custom"
+	}
 	return "source"
 }
 
@@ -135,12 +142,16 @@ func groupTracked(cfg config.Config) map[string][]string {
 	return res
 }
 
-func (m *Manager) getInstalled(k pkgKey) string {
+func (m *Manager) getVersionInstalled(k pkgKey) string {
 	if k.Kind == "custom" {
 		cp := m.customByName(k.Name)
-		if cp.GetInstalledVersion.Command == "" { return "" }
+		if cp.GetInstalledVersion.Command == "" {
+			return ""
+		}
 		res := executil.RunShell(cp.GetInstalledVersion.Command)
-		if res.Code != 0 { return "" }
+		if res.Code != 0 {
+			return ""
+		}
 		return strings.TrimSpace(res.Stdout)
 	}
 	src := m.sourceByName(k.Source)
@@ -154,12 +165,16 @@ func (m *Manager) getInstalled(k pkgKey) string {
 	}
 }
 
-func (m *Manager) getAvailable(k pkgKey) string {
+func (m *Manager) getVersionAvailable(k pkgKey) string {
 	if k.Kind == "custom" {
 		cp := m.customByName(k.Name)
-		if cp.GetLatestVersion.Command == "" { return "" }
+		if cp.GetLatestVersion.Command == "" {
+			return ""
+		}
 		res := executil.RunShell(cp.GetLatestVersion.Command)
-		if res.Code != 0 { return "" }
+		if res.Code != 0 {
+			return ""
+		}
 		return strings.TrimSpace(res.Stdout)
 	}
 	src := m.sourceByName(k.Source)
@@ -179,18 +194,24 @@ func (m *Manager) updateCustomWithRunner(cp config.CustomPackage, runner Runner,
 	installed := ""
 	if cp.GetLatestVersion.Command != "" {
 		res := executil.RunShell(cp.GetLatestVersion.Command)
-		if res.Code != 0 { return fmt.Errorf("command failed for %s [get_latest_version]: exit %d\n%s", cp.Name, res.Code, res.Stderr) }
+		if res.Code != 0 {
+			return fmt.Errorf("command failed for %s [get_latest_version]: exit %d\n%s", cp.Name, res.Code, res.Stderr)
+		}
 		latest = strings.TrimSpace(res.Stdout)
 	}
 	if cp.GetInstalledVersion.Command != "" {
 		res := executil.RunShell(cp.GetInstalledVersion.Command)
-		if res.Code != 0 { return fmt.Errorf("command failed for %s [get_installed_version]: exit %d\n%s", cp.Name, res.Code, res.Stderr) }
+		if res.Code != 0 {
+			return fmt.Errorf("command failed for %s [get_installed_version]: exit %d\n%s", cp.Name, res.Code, res.Stderr)
+		}
 		installed = strings.TrimSpace(res.Stdout)
 	}
 	if cp.CompareVersions.Command != "" {
 		script := fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.CompareVersions.Command)
 		res := executil.RunShell(script)
-		if res.Code != 0 { return fmt.Errorf("command failed for %s [compare_versions]: exit %d\n%s", cp.Name, res.Code, res.Stderr) }
+		if res.Code != 0 {
+			return fmt.Errorf("command failed for %s [compare_versions]: exit %d\n%s", cp.Name, res.Code, res.Stderr)
+		}
 		out := strings.ToLower(strings.TrimSpace(res.Stdout))
 		need = out == "true" || out == "1" || out == "yes"
 	} else {
@@ -205,14 +226,22 @@ func (m *Manager) updateCustomWithRunner(cp config.CustomPackage, runner Runner,
 	if need {
 		if cp.Download.Command != "" {
 			dl := fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.Download.Command)
-			if err := runner.Run(cp.Name, "download", dl, cp.Download.RequireRoot); err != nil { return err }
+			if err := runner.Run(cp.Name, "download", dl, cp.Download.RequireRoot); err != nil {
+				return err
+			}
 		}
 		if cp.Remove.Command != "" {
-			if err := runner.Run(cp.Name, "remove-before-install", cp.Remove.Command, cp.Remove.RequireRoot); err != nil { return err }
+			if err := runner.Run(cp.Name, "remove-before-install", cp.Remove.Command, cp.Remove.RequireRoot); err != nil {
+				return err
+			}
 		}
-		if cp.Install.Command == "" { return fmt.Errorf("missing install script for custom package: %s", cp.Name) }
+		if cp.Install.Command == "" {
+			return fmt.Errorf("missing install script for custom package: %s", cp.Name)
+		}
 		inst := fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.Install.Command)
-		if err := runner.Run(cp.Name, "install", inst, cp.Install.RequireRoot); err != nil { return err }
+		if err := runner.Run(cp.Name, "install", inst, cp.Install.RequireRoot); err != nil {
+			return err
+		}
 		r.OnPackageUpdated(PackageKey{Source: "custom", Name: cp.Name, Kind: "custom"}, true, "")
 		return nil
 	}

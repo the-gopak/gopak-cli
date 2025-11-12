@@ -16,6 +16,7 @@ type phaseDoneMsg struct{ name string }
 type updateStartMsg struct{}
 type pkgUpdatedMsg struct{ k manager.PackageKey; ok bool; err string }
 type confirmRequestMsg struct{ ch chan bool }
+type pendingUpdatesReqMsg struct{ ch chan bool }
 type finishMsg struct{}
 
 type model struct {
@@ -63,6 +64,23 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     case confirmRequestMsg:
         m.confirmCh = msg.ch
         m.confirmStage = true
+        return m, nil
+    case pendingUpdatesReqMsg:
+        has := false
+        if len(m.groups) > 0 {
+            keys := make([]string, 0, len(m.groups))
+            for g := range m.groups { keys = append(keys, g) }
+            for _, grp := range keys {
+                names := append([]string{}, m.groups[grp]...)
+                for _, n := range names {
+                    k := manager.PackageKey{Source: grp, Name: n, Kind: kindOf(grp)}
+                    s := m.status[k]
+                    if s.Available != "" && (s.Installed == "" || s.Installed != s.Available) { has = true; break }
+                }
+                if has { break }
+            }
+        }
+        if msg.ch != nil { msg.ch <- has }
         return m, nil
     case tea.KeyMsg:
         if m.confirmStage {
@@ -162,10 +180,12 @@ func (r *bubbleReporter) OnAvailable(k manager.PackageKey, version string) { r.p
 func (r *bubbleReporter) OnPhaseDone(name string) { r.p.Send(phaseDoneMsg{name: name}) }
 
 func (r *bubbleReporter) ConfirmProceed() bool {
+    check := make(chan bool, 1)
+    r.p.Send(pendingUpdatesReqMsg{ch: check})
+    if has := <-check; !has { return false }
     ch := make(chan bool, 1)
     r.p.Send(confirmRequestMsg{ch: ch})
-    res := <-ch
-    return res
+    return <-ch
 }
 
 func (r *bubbleReporter) OnUpdateStart() { r.p.Send(updateStartMsg{}) }
