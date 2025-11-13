@@ -52,7 +52,9 @@ func SetVerbose(v bool) { verbose = v }
 
 // Debug prints only when verbose mode is enabled.
 func Debug(msg string) {
-	if !verbose { return }
+	if !verbose {
+		return
+	}
 	fmt.Println(color("90", msg))
 	log.Println("[DEBUG] " + msg)
 }

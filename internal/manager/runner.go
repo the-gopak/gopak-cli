@@ -17,6 +17,8 @@ type Runner interface {
 type SudoRunner struct {
 	keepOnce sync.Once
 	stopCh   chan struct{}
+	mu       sync.Mutex
+	authed   bool
 }
 
 func NewSudoRunner() *SudoRunner { return &SudoRunner{} }
@@ -41,18 +43,28 @@ func (r *SudoRunner) ensureKeepAliveStarted() {
 
 func (r *SudoRunner) Run(name, step, script string, require *bool) error {
 	needRoot := false
-	if require != nil && *require { needRoot = true }
+	if require != nil && *require {
+		needRoot = true
+	}
 	final := script
 	if needRoot {
 		if os.Geteuid() != 0 {
-			vcmd := exec.Command("sudo", "-v")
-			vcmd.Stdin = os.Stdin
-			if err := vcmd.Run(); err != nil {
-				return fmt.Errorf("sudo auth failed for %s [%s]: %v", name, step, err)
+			r.mu.Lock()
+			if !r.authed {
+				vcmd := exec.Command("sudo", "-v")
+				vcmd.Stdin = os.Stdin
+				vcmd.Stdout = os.Stdout
+				vcmd.Stderr = os.Stderr
+				if err := vcmd.Run(); err != nil {
+					r.mu.Unlock()
+					return fmt.Errorf("sudo auth failed for %s [%s]: %v", name, step, err)
+				}
+				r.authed = true
+				r.ensureKeepAliveStarted()
 			}
-			r.ensureKeepAliveStarted()
+			r.mu.Unlock()
 			esc := strings.ReplaceAll(script, "'", "'\"'\"'")
-			final = fmt.Sprintf("sudo bash -ceu '%s'", esc)
+			final = fmt.Sprintf("sudo -n bash -ceu '%s'", esc)
 		}
 	}
 	cmd := exec.Command("bash", "-ceu", final)

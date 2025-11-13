@@ -6,6 +6,8 @@
 # Local binaries
 universal-linux-installer
 unilin
+main
+gopak
 
 # Test/coverage outputs
 coverage.out

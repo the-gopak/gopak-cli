@@ -48,10 +48,18 @@ custom_packages:
       command: "echo in"
 `), 0o644)
 	cfg, err := LoadFromFiles([]string{f2, f1})
-	if err != nil { t.Fatalf("unexpected err: %v", err) }
-	if len(cfg.Sources) != 2 { t.Fatalf("want 2 sources, got %d", len(cfg.Sources)) }
-	if len(cfg.Packages) != 1 { t.Fatalf("want 1 pkg, got %d", len(cfg.Packages)) }
-	if len(cfg.CustomPackages) != 1 { t.Fatalf("want 1 custom pkg, got %d", len(cfg.CustomPackages)) }
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(cfg.Sources) != 2 {
+		t.Fatalf("want 2 sources, got %d", len(cfg.Sources))
+	}
+	if len(cfg.Packages) != 1 {
+		t.Fatalf("want 1 pkg, got %d", len(cfg.Packages))
+	}
+	if len(cfg.CustomPackages) != 1 {
+		t.Fatalf("want 1 custom pkg, got %d", len(cfg.CustomPackages))
+	}
 }
 
 func TestLoadFromFiles_DuplicateSource(t *testing.T) {
@@ -69,7 +77,9 @@ func TestLoadFromFiles_DuplicateSource(t *testing.T) {
      name: apt
  `), 0o644)
 	_, err := LoadFromFiles([]string{f1, f2})
-	if err == nil { t.Fatalf("expected duplicate error") }
+	if err == nil {
+		t.Fatalf("expected duplicate error")
+	}
 }
 
 func TestLoadFromFiles_DuplicatePackageAcrossKinds(t *testing.T) {
@@ -92,5 +102,7 @@ func TestLoadFromFiles_DuplicatePackageAcrossKinds(t *testing.T) {
        command: echo in
  `), 0o644)
 	_, err := LoadFromFiles([]string{f1, f2})
-	if err == nil { t.Fatalf("expected duplicate error") }
+	if err == nil {
+		t.Fatalf("expected duplicate error")
+	}
 }

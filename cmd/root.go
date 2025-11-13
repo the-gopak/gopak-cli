@@ -50,7 +50,9 @@ func initConfig() {
 	entries, _ := os.ReadDir(cfgDir)
 	var files []string
 	for _, e := range entries {
-		if e.IsDir() { continue }
+		if e.IsDir() {
+			continue
+		}
 		name := e.Name()
 		low := strings.ToLower(name)
 		if strings.HasSuffix(low, ".yaml") || strings.HasSuffix(low, ".yml") {

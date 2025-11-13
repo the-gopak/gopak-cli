@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"context"
-
 	"github.com/spf13/cobra"
 	"github.com/viktorprogger/universal-linux-installer/internal/config"
 	"github.com/viktorprogger/universal-linux-installer/internal/manager"
@@ -20,10 +18,9 @@ func init() {
 			if len(args) == 1 {
 				return m.UpdateOne(args[0])
 			}
-			reporter := console.NewConsoleReporter()
-			runner := manager.NewSudoRunner()
-			defer runner.Close()
-			return m.UpdateAll(context.Background(), reporter, runner)
+			ui := console.NewConsoleUI(m)
+
+			return ui.Update()
 		},
 	}
 	rootCmd.AddCommand(cmd)

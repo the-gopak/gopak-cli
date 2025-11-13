@@ -1,7 +1,6 @@
 package manager
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -10,106 +9,6 @@ import (
 	"github.com/viktorprogger/universal-linux-installer/internal/config"
 	"github.com/viktorprogger/universal-linux-installer/internal/executil"
 )
-
-type pkgKey struct {
-	Source string
-	Name   string
-	Kind   string
-}
-
-type pkgStatus struct {
-	Installed string
-	Available string
-}
-
-func (m *Manager) UpdateAll(ctx context.Context, r UpdateReporter, runner Runner) error {
-	groups := groupTracked(m.cfg)
-	r.OnInit(groups)
-
-	status := make(map[pkgKey]pkgStatus)
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	allKeys := make([]pkgKey, 0)
-	for src, names := range groups {
-		for _, n := range names {
-			k := pkgKey{Source: src, Name: n, Kind: kindOf(src)}
-			allKeys = append(allKeys, k)
-			wg.Add(1)
-			go func(k pkgKey) {
-				defer wg.Done()
-				inst := m.getVersionInstalled(k)
-				mu.Lock()
-				s := status[k]
-				s.Installed = inst
-				status[k] = s
-				mu.Unlock()
-				r.OnInstalled(PackageKey(k), inst)
-			}(k)
-		}
-	}
-	wg.Wait()
-	r.OnPhaseDone("installed")
-
-	wg = sync.WaitGroup{}
-	for _, k := range allKeys {
-		wg.Add(1)
-		go func(k pkgKey) {
-			defer wg.Done()
-			avail := m.getVersionAvailable(k)
-			mu.Lock()
-			s := status[k]
-			s.Available = avail
-			status[k] = s
-			mu.Unlock()
-			r.OnAvailable(PackageKey(k), avail)
-		}(k)
-	}
-	wg.Wait()
-	r.OnPhaseDone("available")
-
-	if !r.ConfirmProceed() {
-		r.OnDone()
-		return nil
-	}
-
-	r.OnUpdateStart()
-	var runWg sync.WaitGroup
-	for src, names := range m.groupSourcesOnly() {
-		names := append([]string{}, names...)
-		s := m.sourceByName(src)
-		if len(names) == 0 || s.Name == "" {
-			continue
-		}
-		if s.Update.Command == "" {
-			return fmt.Errorf("missing update command for source: %s", src)
-		}
-		runWg.Add(1)
-		go func() {
-			defer runWg.Done()
-			cmd := strings.ReplaceAll(s.Update.Command, "{package_list}", strings.Join(names, " "))
-			err := runner.Run(src, "update-group", cmd, s.Update.RequireRoot)
-			for _, n := range names {
-				ok := err == nil
-				msg := ""
-				if err != nil {
-					msg = err.Error()
-				}
-				r.OnPackageUpdated(PackageKey{Source: src, Name: n, Kind: kindOf(src)}, ok, msg)
-			}
-		}()
-	}
-	for _, cp := range m.cfg.CustomPackages {
-		cp := cp
-		runWg.Add(1)
-		go func() {
-			defer runWg.Done()
-			_ = m.updateCustomWithRunner(cp, runner, r)
-		}()
-	}
-	runWg.Wait()
-	r.OnDone()
-	return nil
-}
 
 func (m *Manager) groupSourcesOnly() map[string][]string {
 	res := map[string][]string{}
@@ -142,7 +41,7 @@ func groupTracked(cfg config.Config) map[string][]string {
 	return res
 }
 
-func (m *Manager) getVersionInstalled(k pkgKey) string {
+func (m *Manager) getVersionInstalled(k PackageKey) string {
 	if k.Kind == "custom" {
 		cp := m.customByName(k.Name)
 		if cp.GetInstalledVersion.Command == "" {
@@ -157,7 +56,7 @@ func (m *Manager) getVersionInstalled(k pkgKey) string {
 	src := m.sourceByName(k.Source)
 	switch src.Name {
 	case "apt":
-		cmd := fmt.Sprintf("dpkg-query -W -f='${Version}\n' %s 2>/dev/null || true", k.Name)
+		cmd := fmt.Sprintf("dpkg-query -W -f='${Version}\\n' %s 2>/dev/null || true", k.Name)
 		res := executil.RunShell(cmd)
 		return strings.TrimSpace(res.Stdout)
 	default:
@@ -165,7 +64,7 @@ func (m *Manager) getVersionInstalled(k pkgKey) string {
 	}
 }
 
-func (m *Manager) getVersionAvailable(k pkgKey) string {
+func (m *Manager) getVersionAvailable(k PackageKey) string {
 	if k.Kind == "custom" {
 		cp := m.customByName(k.Name)
 		if cp.GetLatestVersion.Command == "" {
@@ -188,7 +87,7 @@ func (m *Manager) getVersionAvailable(k pkgKey) string {
 	}
 }
 
-func (m *Manager) updateCustomWithRunner(cp config.CustomPackage, runner Runner, r UpdateReporter) error {
+func (m *Manager) updateCustomWithRunner(cp config.CustomPackage, runner Runner) error {
 	need := false
 	latest := ""
 	installed := ""
@@ -242,9 +141,143 @@ func (m *Manager) updateCustomWithRunner(cp config.CustomPackage, runner Runner,
 		if err := runner.Run(cp.Name, "install", inst, cp.Install.RequireRoot); err != nil {
 			return err
 		}
-		r.OnPackageUpdated(PackageKey{Source: "custom", Name: cp.Name, Kind: "custom"}, true, "")
 		return nil
 	}
-	r.OnPackageUpdated(PackageKey{Source: "custom", Name: cp.Name, Kind: "custom"}, true, "")
+	return nil
+}
+
+func (m *Manager) Tracked() map[string][]string {
+	return groupTracked(m.cfg)
+}
+
+func (m *Manager) GetVersionsInstalled(keys []PackageKey) map[PackageKey]string {
+	out := make(map[PackageKey]string, len(keys))
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	for _, k := range keys {
+		k := k
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			v := m.getVersionInstalled(k)
+			mu.Lock()
+			out[k] = v
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	return out
+}
+
+func (m *Manager) GetVersionsAvailable(keys []PackageKey) map[PackageKey]string {
+	out := make(map[PackageKey]string, len(keys))
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	for _, k := range keys {
+		k := k
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			v := m.getVersionAvailable(k)
+			mu.Lock()
+			out[k] = v
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	return out
+}
+
+func (m *Manager) UpdateSelected(keys []PackageKey, runner Runner, onUpdate func(PackageKey, bool, string)) error {
+	bySrcInstall := map[string][]string{}
+	bySrcUpdate := map[string][]string{}
+	customSet := map[string]struct{}{}
+	// classify per package
+	for _, k := range keys {
+		if k.Kind == "custom" {
+			customSet[k.Name] = struct{}{}
+			continue
+		}
+		installed := m.getVersionInstalled(k)
+		if installed == "" {
+			bySrcInstall[k.Source] = append(bySrcInstall[k.Source], k.Name)
+		} else {
+			bySrcUpdate[k.Source] = append(bySrcUpdate[k.Source], k.Name)
+		}
+	}
+
+	var wg sync.WaitGroup
+	// run installs per source
+	for src, names := range bySrcInstall {
+		src, names := src, append([]string{}, names...)
+		s := m.sourceByName(src)
+		if len(names) == 0 || s.Name == "" {
+			continue
+		}
+		if s.Install.Command == "" {
+			return fmt.Errorf("missing install command for source: %s", src)
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cmd := strings.ReplaceAll(s.Install.Command, "{package_list}", strings.Join(names, " "))
+			err := runner.Run(src, "install-group", cmd, s.Install.RequireRoot)
+			for _, n := range names {
+				ok := err == nil
+				msg := "installed"
+				if err != nil {
+					msg = err.Error()
+				}
+				if onUpdate != nil {
+					onUpdate(PackageKey{Source: src, Name: n, Kind: kindOf(src)}, ok, msg)
+				}
+			}
+		}()
+	}
+	// run updates per source
+	for src, names := range bySrcUpdate {
+		src, names := src, append([]string{}, names...)
+		s := m.sourceByName(src)
+		if len(names) == 0 || s.Name == "" {
+			continue
+		}
+		if s.Update.Command == "" {
+			return fmt.Errorf("missing update command for source: %s", src)
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cmd := strings.ReplaceAll(s.Update.Command, "{package_list}", strings.Join(names, " "))
+			err := runner.Run(src, "update-group", cmd, s.Update.RequireRoot)
+			for _, n := range names {
+				ok := err == nil
+				msg := "updated"
+				if err != nil {
+					msg = err.Error()
+				}
+				if onUpdate != nil {
+					onUpdate(PackageKey{Source: src, Name: n, Kind: kindOf(src)}, ok, msg)
+				}
+			}
+		}()
+	}
+	// custom
+	for name := range customSet {
+		name := name
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := m.updateCustomWithRunner(m.customByName(name), runner); err != nil {
+				if onUpdate != nil {
+					onUpdate(PackageKey{Source: "custom", Name: name, Kind: "custom"}, false, err.Error())
+				}
+			} else {
+				if onUpdate != nil {
+					onUpdate(PackageKey{Source: "custom", Name: name, Kind: "custom"}, true, "")
+				}
+			}
+		}()
+	}
+	wg.Wait()
 	return nil
 }
