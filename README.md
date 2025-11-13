@@ -2,8 +2,8 @@
 
 A minimal cross-distribution CLI that orchestrates existing package managers (apt, dnf, pacman, zypper, apk, snap, flatpak, brew, …) and custom scripts to install, update, remove, and search software.
 
-- Binary name: `unilin`
-- Default config: `~/.config/unilin/config.yaml`
+- CLI name: `unilin` (binary file name is `universal-linux-installer` unless you build with `-o unilin`)
+- Default config dir: `~/.config/unilin` (all `*.yaml` in this dir are merged)
 - Logs: `~/.config/unilin/logs/unilin.log`
 
 ## Install / Build
@@ -15,24 +15,26 @@ Build from source:
 ```bash
 git clone https://github.com/viktorprogger/universal-linux-installer.git
 cd universal-linux-installer
-go build
-# Binary: ./universal-linux-installer (executes unilin commands)
+go build -o unilin
+# Binary: ./unilin
 ```
 
 Or install to `$GOBIN`:
 
 ```bash
 go install github.com/viktorprogger/universal-linux-installer@latest
+# Binary: $GOBIN/universal-linux-installer
+# Tip: you can symlink it as `unilin` if you prefer that name
 ```
 
 ## Usage
 
 ```bash
-unilin --config /path/to/any.yaml <command> [args]
+unilin [-v] --config /path/to/any.yaml <command> [args]
 ```
 
 Commands:
-- `list` — list configured packages and custom packages with detected versions
+- `list` — list configured packages; for custom packages shows installed version when available
 - `install <name>` — install a configured package or custom package (resolves dependencies)
 - `remove <name>` — remove a configured package or custom package
 - `update [name]` — update one package or all configured packages
@@ -80,30 +82,40 @@ Schema (see `internal/config/types.go`):
 sources:
   - type: package_manager
     name: apt
-    install: "sudo apt install -y {package_list}"
-    remove:  "sudo apt remove -y {package_list}"
-    update:  "sudo apt install --only-upgrade -y {package_list}"
-    search:  "apt search {query}"
+    install:
+      command: "apt install -y {package_list}"
+      require_root: true
+    remove:
+      command: "apt remove -y {package_list}"
+      require_root: true
+    update:
+      command: "apt install --only-upgrade -y {package_list}"
+      require_root: true
+    search:
+      command: "apt search {query}"
+      require_root: false
 
 packages:
   - name: git
     source: apt
     depends_on: []
-    # Optional (default: true). When true, unilin enforces running as root for relevant steps
-    require_root: true
 
 custom_packages:
   - name: mytool
     depends_on: [git]
-    # Optional (default: true). When true, unilin enforces running as root for relevant steps
-    require_root: true
     get_latest_version: "curl -s https://example.com/latest"
     get_installed_version: "mytool --version | sed 's/v//'"
     # Optional: decide update need yourself (stdout: true/false/1/0/yes/no)
     # compare_versions: "[ \"$(...)\" != \"$(...)\" ] && echo true || echo false"
-    download: "curl -L -o /tmp/mytool.tgz https://example.com/mytool.tgz"
-    remove: "sudo rm -f /usr/local/bin/mytool"
-    install: "sudo tar -C /usr/local/bin -xzf /tmp/mytool.tgz mytool"
+    download:
+      command: "curl -L -o /tmp/mytool.tgz https://example.com/mytool.tgz"
+      require_root: false
+    remove:
+      command: "rm -f /usr/local/bin/mytool"
+      require_root: true
+    install:
+      command: "tar -C /usr/local/bin -xzf /tmp/mytool.tgz mytool"
+      require_root: true
 ```
 
 Notes:
@@ -113,19 +125,18 @@ Notes:
 
 ### Permissions: require_root
 
-- Both `packages` and `custom_packages` support `require_root: <bool>`. If omitted, the default is `true`.
-- When effective value is `true`, `unilin` requires running as root for privileged steps and will fail fast with a helpful error:
-  - Packages: `install`, `remove`, `update`.
-  - Custom packages: `download`, `remove-before-install`, `install`.
-- Error example: `root required for mytool [install]. Re-run as root (e.g., with sudo) or set require_root: false in config if safe.`
-- Set `require_root: false` only if your commands do not need elevated privileges on your system.
+- The `require_root` flag is specified per-command (inside `install/remove/update/search` for sources, and inside `download/remove/install/...` for custom packages). If omitted, the default is `false`.
+- When `require_root: true`, `unilin` elevates that step via `sudo` if not already running as root. If `sudo` authentication fails, the step fails.
+- Typical privileged steps:
+  - Packages (from sources): `install`, `remove`, `update`.
+  - Custom packages: `download` (sometimes), `remove-before-install`, `install`.
 
 Tips for custom packages:
 - During `compare_versions`, `download`, and `install`, the environment variables `latest_version` and `installed_version` are injected into your shell scripts to avoid unbound variable errors.
 
 ## Default Sources Reference
 
-A ready-to-copy catalog is provided at `configs/default-sources.yaml`. You can copy the entries you need into your config under `sources:`.
+On first run, embedded defaults are copied to `~/.config/unilin/sources.yaml`. You can copy the entries you need into your config under `sources:`. The same catalog is available in the repository at `internal/assets/default-sources.yaml`.
 
 Included managers:
 - apt (Debian/Ubuntu)
@@ -147,10 +158,18 @@ Example (APT):
 ```yaml
 - type: package_manager
   name: apt
-  install: "sudo apt install -y {package_list}"
-  remove:  "sudo apt remove -y {package_list}"
-  update:  "sudo apt install --only-upgrade -y {package_list}"
-  search:  "apt search {query}"
+  install:
+    command: "apt install -y {package_list}"
+    require_root: true
+  remove:
+    command: "apt remove -y {package_list}"
+    require_root: true
+  update:
+    command: "apt install --only-upgrade -y {package_list}"
+    require_root: true
+  search:
+    command: "apt search {query}"
+    require_root: false
 ```
 
 ## Use Cases
@@ -161,6 +180,7 @@ Example (APT):
   - direct `update` template in a `source`, or
   - custom package logic (`get_latest_version`, `get_installed_version`, `compare_versions`).
 - Model dependencies between entries with `depends_on` and let `unilin` resolve order.
+- Reinstalling the same set of packages onto a new system.
 
 ## Logging
 
@@ -169,7 +189,7 @@ Example (APT):
 
 ## Security
 
-- Many default templates use `sudo`. Review and adapt commands to your environment.
+- `unilin` elevates only the steps that are marked with `require_root: true` using `sudo` when necessary. Review and adapt commands and `require_root` settings to your environment.
 - `unilin` executes the exact shell you configure. Prefer verified sources and checksum validation in custom scripts.
 
 ## Troubleshooting
