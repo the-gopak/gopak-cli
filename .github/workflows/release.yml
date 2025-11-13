@@ -63,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME}"
-          BIN_NAME="unilin"
+          BIN_NAME="gopak"
           OUT_DIR="dist"
           mkdir -p "$OUT_DIR"
 
@@ -79,7 +79,7 @@ jobs:
           OUT_BIN="${OUT_DIR}/${BIN_NAME}_${SUFFIX}${{ matrix.ext }}"
 
           echo "Building ${OUT_BIN}"
-          go build -trimpath -ldflags "-s -w -X github.com/viktorprogger/universal-linux-installer/cmd.version=${VERSION}" -o "$OUT_BIN" ./
+          go build -trimpath -ldflags "-s -w -X github.com/gopak/gopak-cli/cmd.version=${VERSION}" -o "$OUT_BIN" ./
 
           # For Linux, create tar.gz with README and LICENSE
           # For Windows and macOS, create zip with README and LICENSE

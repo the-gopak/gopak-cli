@@ -12,9 +12,9 @@ var verbose bool
 
 func Init() {
 	dir, _ := os.UserConfigDir()
-	p := filepath.Join(dir, "unilin", "logs")
+	p := filepath.Join(dir, "gopak", "logs")
 	_ = os.MkdirAll(p, 0o755)
-	f, _ := os.OpenFile(filepath.Join(p, "unilin.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	f, _ := os.OpenFile(filepath.Join(p, "gopak.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	logfile = f
 	log.SetOutput(f)
 }

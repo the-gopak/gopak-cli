@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/gopak/gopak-cli/internal/assets"
 	"github.com/gopak/gopak-cli/internal/config"
 	"github.com/gopak/gopak-cli/internal/logging"
+	"github.com/spf13/cobra"
 )
 
 var cfgFile string
@@ -18,7 +18,7 @@ var version = "dev"
 
 var rootCmd = &cobra.Command{
 	Use:   "gopak",
-	Short: "Universal Linux Installer",
+	Short: "Universal Package Manager",
 }
 
 func Execute() error { return rootCmd.Execute() }
@@ -41,7 +41,7 @@ func initConfig() {
 				dir = filepath.Join(u.HomeDir, ".config")
 			}
 		}
-		cfgDir = dir + "/unilin"
+		cfgDir = dir + "/gopak"
 	}
 	// Ensure config directory and default sources.yaml exist
 	_ = os.MkdirAll(cfgDir, 0o755)

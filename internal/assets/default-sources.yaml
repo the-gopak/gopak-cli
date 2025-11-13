@@ -1,7 +1,7 @@
-$schema: https://raw.githubusercontent.com/viktorprogger/universal-linux-installer/HEAD/schema/unilin.schema.json
+$schema: https://raw.githubusercontent.com/gopak/gopak-cli/HEAD/schema/gopak.schema.json
 
-# Default popular package manager sources for unilin
-# You can copy snippets from here into your ~/.config/unilin/config.yaml
+# Default popular package manager sources for gopak
+# You can copy snippets from here into your ~/.config/gopak/config.yaml
 
 sources:
   - type: package_manager

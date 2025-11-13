@@ -4,10 +4,9 @@
 /bin/
 
 # Local binaries
-universal-linux-installer
-unilin
 main
 gopak
+gopak-cli
 
 # Test/coverage outputs
 coverage.out

@@ -1,7 +1,7 @@
 {
-  "$id": "https://raw.githubusercontent.com/viktorprogger/universal-linux-installer/HEAD/schema/unilin.schema.json",
+  "$id": "https://raw.githubusercontent.com/gopak/gopak-cli/HEAD/schema/gopak.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "unilin configuration",
+  "title": "Gopak configuration",
   "type": "object",
   "properties": {
     "sources": {

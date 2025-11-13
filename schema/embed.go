@@ -2,5 +2,5 @@ package schema
 
 import _ "embed"
 
-//go:embed unilin.schema.json
+//go:embed gopak.schema.json
 var Bytes []byte

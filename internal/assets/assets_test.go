@@ -7,7 +7,7 @@ import (
 )
 
 func TestWriteDefaultSourcesIfMissing(t *testing.T) {
-	dir, err := os.MkdirTemp("", "unilin-assets-*")
+	dir, err := os.MkdirTemp("", "gopak-assets-*")
 	if err != nil {
 		t.Fatalf("temp dir: %v", err)
 	}
