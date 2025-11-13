@@ -7,7 +7,7 @@ import (
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
-	"github.com/viktorprogger/universal-linux-installer/internal/manager"
+	"github.com/gopak/gopak-cli/internal/manager"
 )
 
 func (c *ConsoleUI) RunListImperative() error {

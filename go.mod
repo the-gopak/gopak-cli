@@ -1,4 +1,4 @@
-module github.com/viktorprogger/universal-linux-installer
+module github.com/gopak/gopak-cli
 
 go 1.25
 

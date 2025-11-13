@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	schemaData "github.com/viktorprogger/universal-linux-installer/schema"
+	schemaData "github.com/gopak/gopak-cli/schema"
 	"github.com/xeipuuv/gojsonschema"
 )
 

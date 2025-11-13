@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/viktorprogger/universal-linux-installer/internal/config"
+	"github.com/gopak/gopak-cli/internal/config"
 )
 
 func TestGroupTracked(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/viktorprogger/universal-linux-installer/internal/manager"
+	"github.com/gopak/gopak-cli/internal/manager"
 )
 
 func TestRenderGroups_HideUpToDate(t *testing.T) {

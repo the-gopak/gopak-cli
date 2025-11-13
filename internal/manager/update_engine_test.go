@@ -3,7 +3,7 @@ package manager
 import (
 	"testing"
 
-	"github.com/viktorprogger/universal-linux-installer/internal/config"
+	"github.com/gopak/gopak-cli/internal/config"
 )
 
 type mockRunner struct{ calls []string }

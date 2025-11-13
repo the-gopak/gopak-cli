@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/viktorprogger/universal-linux-installer/internal/config"
-	"github.com/viktorprogger/universal-linux-installer/internal/executil"
+	"github.com/gopak/gopak-cli/internal/config"
+	"github.com/gopak/gopak-cli/internal/executil"
 )
 
 func (m *Manager) groupSourcesOnly() map[string][]string {

@@ -1,7 +1,7 @@
 package manager
 
 import (
-	"github.com/viktorprogger/universal-linux-installer/internal/config"
+	"github.com/gopak/gopak-cli/internal/config"
 	"os"
 	"testing"
 )

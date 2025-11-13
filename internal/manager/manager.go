@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/viktorprogger/universal-linux-installer/internal/config"
-	"github.com/viktorprogger/universal-linux-installer/internal/executil"
-	"github.com/viktorprogger/universal-linux-installer/internal/logging"
+	"github.com/gopak/gopak-cli/internal/config"
+	"github.com/gopak/gopak-cli/internal/executil"
+	"github.com/gopak/gopak-cli/internal/logging"
 )
 
 type Manager struct{ cfg config.Config }

@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/viktorprogger/universal-linux-installer/internal/config"
-	"github.com/viktorprogger/universal-linux-installer/internal/manager"
-	"github.com/viktorprogger/universal-linux-installer/internal/ui/console"
+	"github.com/gopak/gopak-cli/internal/config"
+	"github.com/gopak/gopak-cli/internal/manager"
+	"github.com/gopak/gopak-cli/internal/ui/console"
 )
 
 func init() {

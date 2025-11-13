@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/viktorprogger/universal-linux-installer/internal/assets"
-	"github.com/viktorprogger/universal-linux-installer/internal/config"
-	"github.com/viktorprogger/universal-linux-installer/internal/logging"
+	"github.com/gopak/gopak-cli/internal/assets"
+	"github.com/gopak/gopak-cli/internal/config"
+	"github.com/gopak/gopak-cli/internal/logging"
 )
 
 var cfgFile string
@@ -17,14 +17,14 @@ var verbose bool
 var version = "dev"
 
 var rootCmd = &cobra.Command{
-	Use:   "unilin",
+	Use:   "gopak",
 	Short: "Universal Linux Installer",
 }
 
 func Execute() error { return rootCmd.Execute() }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "path to any YAML file inside the config directory (default dir: ~/.config/unilin); all *.yaml in that directory are merged")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "path to any YAML file inside the config directory (default dir: ~/.config/gopak); all *.yaml in that directory are merged")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "show detailed steps and commands")
 	rootCmd.Version = version
 	cobra.OnInitialize(initConfig)

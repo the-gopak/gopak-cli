@@ -1,7 +1,7 @@
 package console
 
 import (
-	"github.com/viktorprogger/universal-linux-installer/internal/manager"
+	"github.com/gopak/gopak-cli/internal/manager"
 )
 
 // ConsoleUI renders and controls the interactive console update flow.
