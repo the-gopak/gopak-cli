@@ -7,9 +7,9 @@ import (
 	"sync"
 
 	survey "github.com/AlecAivazis/survey/v2"
+	"github.com/gopak/gopak-cli/internal/manager"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
-	"github.com/gopak/gopak-cli/internal/manager"
 )
 
 // updateEvent captures a single package update outcome.
@@ -91,12 +91,12 @@ func (c *ConsoleUI) Update() error {
 			need = append(need, k)
 		}
 	}
+	repaint(len(need) > 0)
+
 	if len(need) == 0 {
 		fmt.Println("Nothing to update")
 		return nil
 	}
-
-	repaint(true)
 
 	labels := make([]string, 0, len(need))
 	labelByKey := map[string]manager.PackageKey{}

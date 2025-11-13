@@ -45,7 +45,6 @@ func initConfig() {
 	}
 	// Ensure config directory and default sources.yaml exist
 	_ = os.MkdirAll(cfgDir, 0o755)
-	_ = assets.WriteDefaultSourcesIfMissing(cfgDir)
 	// Gather all YAML files and load
 	entries, _ := os.ReadDir(cfgDir)
 	var files []string
@@ -59,11 +58,7 @@ func initConfig() {
 			files = append(files, filepath.Join(cfgDir, name))
 		}
 	}
-	if len(files) == 0 {
-		logging.Error("no YAML config files found in " + cfgDir)
-		os.Exit(1)
-	}
-	cfg, err := config.LoadFromFiles(files)
+	cfg, err := config.LoadDefaultsAndFiles(assets.DefaultSources, files)
 	if err != nil {
 		logging.Error("config error: " + err.Error())
 		os.Exit(1)
