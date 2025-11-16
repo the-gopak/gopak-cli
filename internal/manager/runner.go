@@ -41,6 +41,28 @@ func (r *SudoRunner) ensureKeepAliveStarted() {
 	})
 }
 
+func (r *SudoRunner) ensureRootAccess() bool {
+	if os.Geteuid() == 0 {
+		return true
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.authed {
+		return true
+	}
+	vcmd := exec.Command("sudo", "-v")
+	vcmd.Stdin = os.Stdin
+	vcmd.Stdout = os.Stdout
+	vcmd.Stderr = os.Stderr
+	if err := vcmd.Run(); err != nil {
+		return false
+	}
+	r.authed = true
+	r.ensureKeepAliveStarted()
+
+	return true
+}
+
 func (r *SudoRunner) Run(name, step, script string, require *bool) error {
 	needRoot := false
 	if require != nil && *require {
@@ -48,24 +70,12 @@ func (r *SudoRunner) Run(name, step, script string, require *bool) error {
 	}
 	final := script
 	if needRoot {
-		if os.Geteuid() != 0 {
-			r.mu.Lock()
-			if !r.authed {
-				vcmd := exec.Command("sudo", "-v")
-				vcmd.Stdin = os.Stdin
-				vcmd.Stdout = os.Stdout
-				vcmd.Stderr = os.Stderr
-				if err := vcmd.Run(); err != nil {
-					r.mu.Unlock()
-					return fmt.Errorf("sudo auth failed for %s [%s]: %v", name, step, err)
-				}
-				r.authed = true
-				r.ensureKeepAliveStarted()
-			}
-			r.mu.Unlock()
-			esc := strings.ReplaceAll(script, "'", "'\"'\"'")
-			final = fmt.Sprintf("sudo -n bash -ceu '%s'", esc)
+		if !r.ensureRootAccess() {
+			return fmt.Errorf("sudo auth not granted for %s [%s]", name, step)
 		}
+
+		esc := strings.ReplaceAll(script, "'", "'\"'\"'")
+		final = fmt.Sprintf("sudo -n bash -ceu '%s'", esc)
 	}
 	cmd := exec.Command("bash", "-ceu", final)
 	cmd.Stdout = os.Stdout

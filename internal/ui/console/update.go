@@ -115,10 +115,9 @@ func (c *ConsoleUI) Update() error {
 		labels = append(labels, lbl)
 		labelByKey[lbl] = k
 	}
-	selectedLabels := make([]string, 0, len(labels))
-	selectedLabels = append(selectedLabels, labels...)
 
-	ms := &survey.MultiSelect{Message: "Select packages to update", Options: labels, Default: selectedLabels}
+	selectedLabels := make([]string, 0)
+	ms := &survey.MultiSelect{Message: "Select packages to update", Options: labels, Default: labels}
 	if err := survey.AskOne(ms, &selectedLabels); err != nil {
 		return err
 	}
@@ -130,6 +129,7 @@ func (c *ConsoleUI) Update() error {
 	for _, l := range selectedLabels {
 		keysSelected = append(keysSelected, labelByKey[l])
 	}
+	fmt.Printf("%v\n", keysSelected)
 
 	ok := false
 	if err := survey.AskOne(&survey.Confirm{Message: "Proceed to update selected?", Default: true}, &ok); err != nil {
@@ -141,6 +141,7 @@ func (c *ConsoleUI) Update() error {
 
 	runner := manager.NewSudoRunner()
 	defer runner.Close()
+
 	var wgU sync.WaitGroup
 	evCh := make(chan updateEvent, 16)
 	wgU.Add(1)
@@ -151,6 +152,7 @@ func (c *ConsoleUI) Update() error {
 		})
 	}()
 	go func() { wgU.Wait(); close(evCh) }()
+
 	for e := range evCh {
 		if e.ok {
 			action := e.msg

@@ -2,17 +2,19 @@ package config
 
 import (
 	"fmt"
+
 	"gopkg.in/yaml.v3"
 )
 
 type Source struct {
-	Type     string  `mapstructure:"type" yaml:"type" json:"type"`
-	Name     string  `mapstructure:"name" yaml:"name" json:"name"`
-	Install  Command `mapstructure:"install" yaml:"install" json:"install"`
-	Remove   Command `mapstructure:"remove" yaml:"remove" json:"remove"`
-	Update   Command `mapstructure:"update" yaml:"update" json:"update"`
-	Search   Command `mapstructure:"search" yaml:"search" json:"search"`
-	Outdated Command `mapstructure:"outdated" yaml:"outdated" json:"outdated"`
+	Type                string  `mapstructure:"type" yaml:"type" json:"type"`
+	Name                string  `mapstructure:"name" yaml:"name" json:"name"`
+	Install             Command `mapstructure:"install" yaml:"install" json:"install"`
+	Remove              Command `mapstructure:"remove" yaml:"remove" json:"remove"`
+	Update              Command `mapstructure:"update" yaml:"update" json:"update"`
+	Search              Command `mapstructure:"search" yaml:"search" json:"search"`
+	Outdated            Command `mapstructure:"outdated" yaml:"outdated" json:"outdated"`
+	GetInstalledVersion Command `mapstructure:"get_installed_version" yaml:"get_installed_version" json:"get_installed_version"`
 }
 
 type Package struct {

@@ -34,7 +34,7 @@ gopak [-v] --config /path/to/any.yaml <command> [args]
 ```
 
 Commands:
-- `list` — list configured packages; for custom packages shows installed version when available
+- `list` — list configured packages and versions
 - `install <name>` — install a configured package or custom package (resolves dependencies)
 - `remove <name>` — remove a configured package or custom package
 - `update [name]` — update one package or all configured packages
@@ -94,6 +94,9 @@ sources:
     search:
       command: "apt search {query}"
       require_root: false
+    get_installed_version:
+      command: "dpkg-query -W -f='${Version}' {package}"
+      require_root: false
 
 packages:
   - name: git
@@ -121,6 +124,7 @@ custom_packages:
 Notes:
 - `{package_list}` is replaced with the space-separated list provided by `gopak` (typically a single name).
 - `{query}` is replaced in `search` commands.
+- `{package}` is replaced with a single package name when executing `get_installed_version` commands for package managers.
 - `depends_on` is supported for both `packages` and `custom_packages`. `gopak` computes a topological order and installs dependencies first.
 
 ### Permissions: require_root
@@ -153,6 +157,7 @@ Each entry defines commands for:
 - `remove`: uninstall
 - `update`: upgrade packages
 - `search`: search the catalog
+ - `get_installed_version`: print currently installed version of a single package (used by `list` and `update`)
 
 Example (APT):
 ```yaml
@@ -169,6 +174,9 @@ Example (APT):
     require_root: true
   search:
     command: "apt search {query}"
+    require_root: false
+  get_installed_version:
+    command: "dpkg-query -W -f='${Version}' {package}"
     require_root: false
 ```
 

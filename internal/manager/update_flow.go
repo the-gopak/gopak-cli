@@ -54,6 +54,17 @@ func (m *Manager) getVersionInstalled(k PackageKey) string {
 		return strings.TrimSpace(res.Stdout)
 	}
 	src := m.sourceByName(k.Source)
+	if src.Name == "" {
+		return ""
+	}
+	if src.GetInstalledVersion.Command != "" {
+		cmd := strings.ReplaceAll(src.GetInstalledVersion.Command, "{package}", k.Name)
+		res := executil.RunShell(cmd)
+		if res.Code != 0 {
+			return ""
+		}
+		return strings.TrimSpace(res.Stdout)
+	}
 	switch src.Name {
 	case "apt":
 		cmd := fmt.Sprintf("dpkg-query -W -f='${Version}\\n' %s 2>/dev/null || true", k.Name)

@@ -15,7 +15,8 @@
           "remove": { "$ref": "#/definitions/command" },
           "update": { "$ref": "#/definitions/command" },
           "search": { "$ref": "#/definitions/command" },
-          "outdated": { "$ref": "#/definitions/command" }
+          "outdated": { "$ref": "#/definitions/command" },
+          "get_installed_version": { "$ref": "#/definitions/command" }
         },
         "required": ["type", "name"],
         "additionalProperties": false
