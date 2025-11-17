@@ -186,7 +186,6 @@ func renderGroups(groups map[string][]string, status map[manager.PackageKey]mana
 		return keys[i] < keys[j]
 	})
 	for _, grp := range keys {
-		b.WriteString(text.Bold.Sprint(grp) + "\n")
 		tw := table.NewWriter()
 		tw.SetStyle(table.StyleLight)
 		tw.AppendHeader(table.Row{"Package", "Current", "Installable"})
@@ -215,8 +214,11 @@ func renderGroups(groups map[string][]string, status map[manager.PackageKey]mana
 			}
 			tw.AppendRow(table.Row{name, cur, ins})
 		}
-		b.WriteString(tw.Render())
-		b.WriteString("\n\n")
+		if tw.Length() > 0 {
+			b.WriteString(text.Bold.Sprint(grp) + "\n")
+			b.WriteString(tw.Render())
+			b.WriteString("\n\n")
+		}
 	}
 	return b.String()
 }

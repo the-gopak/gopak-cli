@@ -87,7 +87,9 @@ func (m *Manager) getVersionAvailable(k PackageKey) string {
 		}
 		return strings.TrimSpace(res.Stdout)
 	}
+
 	src := m.sourceByName(k.Source)
+	m.ensurePreUpdate(src)
 	if src.Name == "" {
 		return ""
 	}
@@ -192,6 +194,7 @@ func (m *Manager) GetVersionsInstalled(keys []PackageKey) map[PackageKey]string 
 }
 
 func (m *Manager) GetVersionsAvailable(keys []PackageKey) map[PackageKey]string {
+	resetPreUpdateCache()
 	out := make(map[PackageKey]string, len(keys))
 	var wg sync.WaitGroup
 	var mu sync.Mutex

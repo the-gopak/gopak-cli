@@ -1,11 +1,14 @@
 package manager
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gopak/gopak-cli/internal/config"
 	"github.com/gopak/gopak-cli/internal/executil"
@@ -13,6 +16,35 @@ import (
 )
 
 type Manager struct{ cfg config.Config }
+
+var preUpdateOnce sync.Map
+
+func hashScript(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
+func resetPreUpdateCache() {
+	preUpdateOnce.Range(func(k, _ any) bool {
+		preUpdateOnce.Delete(k)
+		return true
+	})
+}
+
+func (m *Manager) ensurePreUpdate(src config.Source) {
+	if src.PreUpdate.Command == "" {
+		return
+	}
+	h := hashScript(src.PreUpdate.Command)
+	if _, loaded := preUpdateOnce.LoadOrStore(h, struct{}{}); loaded {
+		return
+	}
+	logging.Debug(fmt.Sprintf("%s [pre_update]: %s", src.Name, src.PreUpdate.Command))
+	res := executil.RunShell(src.PreUpdate.Command)
+	if res.Code != 0 {
+		logging.Debug(fmt.Sprintf("%s [pre_update failed]: exit=%d", src.Name, res.Code))
+	}
+}
 
 func cmpVersion(a, b string) int {
 	logging.Debug(fmt.Sprintf("cmpVersion input: a=%q b=%q", a, b))

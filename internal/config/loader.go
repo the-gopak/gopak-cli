@@ -150,6 +150,7 @@ func mergeSource(a, b Source) Source {
 	out.Update = mergeCommand(out.Update, b.Update)
 	out.Search = mergeCommand(out.Search, b.Search)
 	out.Outdated = mergeCommand(out.Outdated, b.Outdated)
+	out.PreUpdate = mergeCommand(out.PreUpdate, b.PreUpdate)
 	out.GetInstalledVersion = mergeCommand(out.GetInstalledVersion, b.GetInstalledVersion)
 	out.GetLatestVersion = mergeCommand(out.GetLatestVersion, b.GetLatestVersion)
 	return out

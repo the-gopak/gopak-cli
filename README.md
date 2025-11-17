@@ -72,7 +72,7 @@ Schema support:
 - Errors are also logged to `~/.config/gopak/logs/gopak.log`.
 
 Top-level keys:
-- `sources`: list of package manager templates (install/remove/update/search/get_installed_version/get_latest_version). These are shell snippets with placeholders.
+- `sources`: list of package manager templates (install/remove/update/search/pre_update/get_installed_version/get_latest_version). These are shell snippets with placeholders.
 - `packages`: list of simple packages managed by a specific `source`.
 - `custom_packages`: list of custom packages managed by arbitrary scripts.
 
@@ -129,6 +129,7 @@ Notes:
 - `{query}` is replaced in `search` commands.
 - `{package}` is replaced with a single package name when executing `get_installed_version` / `get_latest_version` commands for package managers.
 - `depends_on` is supported for both `packages` and `custom_packages`. `gopak` computes a topological order and installs dependencies first.
+ - `pre_update` for a source is executed at most once per process for a given script (identified by hash) before any `get_latest_version` is run for that source. `gopak` does not add `sudo` around `pre_update`; if you need root-only behavior, handle it inside the script (e.g. `if [ "$(id -u)" -eq 0 ]; then ...; fi`).
 
 ### Permissions: require_root
 
@@ -160,6 +161,7 @@ Each entry defines commands for:
 - `remove`: uninstall
 - `update`: upgrade packages
 - `search`: search the catalog
+ - `pre_update`: optional hook to refresh package metadata or caches before checking latest versions (runs once per unique script)
  - `get_installed_version`: print currently installed version of a single package (used by `list` and `update`)
  - `get_latest_version`: print latest available version of a single package (used by `update`)
 
@@ -176,6 +178,9 @@ Example (APT):
   update:
     command: "apt install --only-upgrade -y {package_list}"
     require_root: true
+  pre_update:
+    command: "if [ \"$(id -u)\" -eq 0 ]; then apt update -y; fi"
+    require_root: false
   search:
     command: "apt search {query}"
     require_root: false

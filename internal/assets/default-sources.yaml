@@ -15,6 +15,9 @@ sources:
     update:
       command: "apt install --only-upgrade -y {package_list}"
       require_root: true
+    pre_update:
+      command: "tmpdir=\"$(mktemp -d)\" && apt-get -o Dir::State::status=\"$tmpdir/status\" -o Dir::State::Lists=\"$tmpdir/lists\" -o Dir::Cache::Archives=\"$tmpdir/archives\" update"
+      require_root: false
     search:
       command: "apt search {query}"
       require_root: false
@@ -36,6 +39,9 @@ sources:
     update:
       command: "pacman -S --noconfirm {package_list}"
       require_root: true
+    pre_update:
+      command: "tmpdir=\"$(mktemp -d)\" && pacman -Sy --noconfirm --dbpath \"$tmpdir/db\" --cachedir \"$tmpdir/cache\" --logfile \"$tmpdir/pacman.log\""
+      require_root: false
     search:
       command: "pacman -Ss {query}"
       require_root: false
@@ -57,6 +63,9 @@ sources:
     update:
       command: "snap refresh {package_list}"
       require_root: true
+    pre_update:
+      command: "snap refresh"
+      require_root: true
     search:
       command: "snap find {query}"
       require_root: false
@@ -77,6 +86,9 @@ sources:
       require_root: false
     update:
       command: "flatpak update -y {package_list}"
+      require_root: false
+    pre_update:
+      command: "flatpak update --user --appstream"
       require_root: false
     search:
       command: "flatpak search {query}"
