@@ -35,39 +35,34 @@ func (c *ConsoleUI) Update() error {
 	}
 	repaint(false)
 
-	updates := make(chan struct{}, 8)
+	updates := make(chan struct{}, 32)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	for grp, names := range groups {
-		grp := grp
-		names := append([]string{}, names...)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			keys := make([]manager.PackageKey, 0, len(names))
-			for _, n := range names {
-				keys = append(keys, manager.PackageKey{Source: grp, Name: n, Kind: kindOf(grp)})
-			}
-			var ins, av map[manager.PackageKey]string
-			var wg2 sync.WaitGroup
-			wg2.Add(2)
-			go func() { defer wg2.Done(); ins = c.m.GetVersionsInstalled(keys) }()
-			go func() { defer wg2.Done(); av = c.m.GetVersionsAvailable(keys) }()
-			wg2.Wait()
-			mu.Lock()
-			for k, v := range ins {
+		for _, n := range names {
+			k := manager.PackageKey{Source: grp, Name: n, Kind: kindOf(grp)}
+			wg.Add(1)
+			go func(k manager.PackageKey) {
+				defer wg.Done()
+				// Installed version
+				ins := c.m.GetVersionInstalled(k)
+				mu.Lock()
 				s := status[k]
-				s.Installed = v
+				s.Installed = ins
 				status[k] = s
-			}
-			for k, v := range av {
-				s := status[k]
-				s.Available = v
+				mu.Unlock()
+				updates <- struct{}{}
+
+				// Available version
+				av := c.m.GetVersionAvailable(k)
+				mu.Lock()
+				s = status[k]
+				s.Available = av
 				status[k] = s
-			}
-			mu.Unlock()
-			updates <- struct{}{}
-		}()
+				mu.Unlock()
+				updates <- struct{}{}
+			}(k)
+		}
 	}
 	go func() { wg.Wait(); close(updates) }()
 	for range updates {

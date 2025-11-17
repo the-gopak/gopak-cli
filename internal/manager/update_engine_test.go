@@ -14,6 +14,32 @@ func (r *mockRunner) Run(name, step, script string, require *bool) error {
 }
 func (r *mockRunner) Close() error { return nil }
 
+func TestGetVersionInstalled_Custom(t *testing.T) {
+	cfg := config.Config{CustomPackages: []config.CustomPackage{{
+		Name:                "tool",
+		GetInstalledVersion: config.Command{Command: "echo 1.2.3"},
+	}}}
+	m := New(cfg)
+	k := PackageKey{Source: "custom", Name: "tool", Kind: "custom"}
+	got := m.GetVersionInstalled(k)
+	if got != "1.2.3" {
+		t.Fatalf("installed version mismatch: got %q, want %q", got, "1.2.3")
+	}
+}
+
+func TestGetVersionAvailable_Custom(t *testing.T) {
+	cfg := config.Config{CustomPackages: []config.CustomPackage{{
+		Name:             "tool",
+		GetLatestVersion: config.Command{Command: "echo 2.0.0"},
+	}}}
+	m := New(cfg)
+	k := PackageKey{Source: "custom", Name: "tool", Kind: "custom"}
+	got := m.GetVersionAvailable(k)
+	if got != "2.0.0" {
+		t.Fatalf("available version mismatch: got %q, want %q", got, "2.0.0")
+	}
+}
+
 func TestUpdateSelected_Custom_NoNeed(t *testing.T) {
 	cfg := config.Config{CustomPackages: []config.CustomPackage{{
 		Name:                "go",

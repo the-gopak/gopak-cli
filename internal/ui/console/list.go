@@ -5,20 +5,20 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/gopak/gopak-cli/internal/manager"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
-	"github.com/gopak/gopak-cli/internal/manager"
 )
 
 func (c *ConsoleUI) RunListImperative() error {
 	groups := c.m.Tracked()
-	keys := make([]manager.PackageKey, 0)
+	installed := make(map[manager.PackageKey]string)
 	for grp, names := range groups {
 		for _, n := range names {
-			keys = append(keys, manager.PackageKey{Source: grp, Name: n, Kind: kindOf(grp)})
+			k := manager.PackageKey{Source: grp, Name: n, Kind: kindOf(grp)}
+			installed[k] = c.m.GetVersionInstalled(k)
 		}
 	}
-	installed := c.m.GetVersionsInstalled(keys)
 	fmt.Print(renderList(groups, installed))
 	return nil
 }

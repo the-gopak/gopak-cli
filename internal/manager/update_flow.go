@@ -30,14 +30,17 @@ func groupTracked(cfg config.Config) map[string][]string {
 	for _, p := range cfg.Packages {
 		res[p.Source] = append(res[p.Source], p.Name)
 	}
+
 	if len(cfg.CustomPackages) > 0 {
 		for _, c := range cfg.CustomPackages {
 			res["custom"] = append(res["custom"], c.Name)
 		}
 	}
+
 	for k := range res {
 		sort.Strings(res[k])
 	}
+
 	return res
 }
 
@@ -170,47 +173,16 @@ func (m *Manager) updateCustomWithRunner(cp config.CustomPackage, runner Runner)
 	return nil
 }
 
+func (m *Manager) GetVersionInstalled(k PackageKey) string {
+	return m.getVersionInstalled(k)
+}
+
+func (m *Manager) GetVersionAvailable(k PackageKey) string {
+	return m.getVersionAvailable(k)
+}
+
 func (m *Manager) Tracked() map[string][]string {
 	return groupTracked(m.cfg)
-}
-
-func (m *Manager) GetVersionsInstalled(keys []PackageKey) map[PackageKey]string {
-	out := make(map[PackageKey]string, len(keys))
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	for _, k := range keys {
-		k := k
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			v := m.getVersionInstalled(k)
-			mu.Lock()
-			out[k] = v
-			mu.Unlock()
-		}()
-	}
-	wg.Wait()
-	return out
-}
-
-func (m *Manager) GetVersionsAvailable(keys []PackageKey) map[PackageKey]string {
-	resetPreUpdateCache()
-	out := make(map[PackageKey]string, len(keys))
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	for _, k := range keys {
-		k := k
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			v := m.getVersionAvailable(k)
-			mu.Lock()
-			out[k] = v
-			mu.Unlock()
-		}()
-	}
-	wg.Wait()
-	return out
 }
 
 func (m *Manager) UpdateSelected(keys []PackageKey, runner Runner, onUpdate func(PackageKey, bool, string)) error {
