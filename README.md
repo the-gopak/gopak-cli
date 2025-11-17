@@ -72,7 +72,7 @@ Schema support:
 - Errors are also logged to `~/.config/gopak/logs/gopak.log`.
 
 Top-level keys:
-- `sources`: list of package manager templates (install/remove/update/search). These are shell snippets with placeholders.
+- `sources`: list of package manager templates (install/remove/update/search/get_installed_version/get_latest_version). These are shell snippets with placeholders.
 - `packages`: list of simple packages managed by a specific `source`.
 - `custom_packages`: list of custom packages managed by arbitrary scripts.
 
@@ -96,6 +96,9 @@ sources:
       require_root: false
     get_installed_version:
       command: "dpkg-query -W -f='${Version}' {package}"
+      require_root: false
+    get_latest_version:
+      command: "apt-cache policy {package} | awk '/Candidate:/ {print $2}'"
       require_root: false
 
 packages:
@@ -124,7 +127,7 @@ custom_packages:
 Notes:
 - `{package_list}` is replaced with the space-separated list provided by `gopak` (typically a single name).
 - `{query}` is replaced in `search` commands.
-- `{package}` is replaced with a single package name when executing `get_installed_version` commands for package managers.
+- `{package}` is replaced with a single package name when executing `get_installed_version` / `get_latest_version` commands for package managers.
 - `depends_on` is supported for both `packages` and `custom_packages`. `gopak` computes a topological order and installs dependencies first.
 
 ### Permissions: require_root
@@ -158,6 +161,7 @@ Each entry defines commands for:
 - `update`: upgrade packages
 - `search`: search the catalog
  - `get_installed_version`: print currently installed version of a single package (used by `list` and `update`)
+ - `get_latest_version`: print latest available version of a single package (used by `update`)
 
 Example (APT):
 ```yaml
@@ -177,6 +181,9 @@ Example (APT):
     require_root: false
   get_installed_version:
     command: "dpkg-query -W -f='${Version}' {package}"
+    require_root: false
+  get_latest_version:
+    command: "apt-cache policy {package} | awk '/Candidate:/ {print $2}'"
     require_root: false
 ```
 

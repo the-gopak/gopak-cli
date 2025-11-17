@@ -21,6 +21,9 @@ sources:
     get_installed_version:
       command: "dpkg-query -W -f='${Version}' {package}"
       require_root: false
+    get_latest_version:
+      command: "apt-cache policy {package} | awk '/Candidate:/ {print $2}'"
+      require_root: false
 
   - type: package_manager
     name: pacman
@@ -38,6 +41,9 @@ sources:
       require_root: false
     get_installed_version:
       command: "pacman -Qi {package} | grep '^Version' | head -n1 | awk '{print $3}'"
+      require_root: false
+    get_latest_version:
+      command: "pacman -Si {package} | awk '/^Version/ {print $3}'"
       require_root: false
 
   - type: package_manager
@@ -57,6 +63,9 @@ sources:
     get_installed_version:
       command: "snap info {package} | grep '^installed:' | head -n1 | awk '{print $2}'"
       require_root: false
+    get_latest_version:
+      command: "snap info {package} | awk '/^latest:/ {print $2}'"
+      require_root: false
 
   - type: package_manager
     name: flatpak
@@ -74,4 +83,7 @@ sources:
       require_root: false
     get_installed_version:
       command: "flatpak info {package} | grep '^Version:' | head -n1 | awk '{print $2}'"
+      require_root: false
+    get_latest_version:
+      command: "flatpak info {package} | awk '/^Version:/ {print $2}'"
       require_root: false

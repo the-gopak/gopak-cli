@@ -15,6 +15,7 @@ type Source struct {
 	Search              Command `mapstructure:"search" yaml:"search" json:"search"`
 	Outdated            Command `mapstructure:"outdated" yaml:"outdated" json:"outdated"`
 	GetInstalledVersion Command `mapstructure:"get_installed_version" yaml:"get_installed_version" json:"get_installed_version"`
+	GetLatestVersion    Command `mapstructure:"get_latest_version" yaml:"get_latest_version" json:"get_latest_version"`
 }
 
 type Package struct {

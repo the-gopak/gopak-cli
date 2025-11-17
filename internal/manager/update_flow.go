@@ -88,6 +88,17 @@ func (m *Manager) getVersionAvailable(k PackageKey) string {
 		return strings.TrimSpace(res.Stdout)
 	}
 	src := m.sourceByName(k.Source)
+	if src.Name == "" {
+		return ""
+	}
+	if src.GetLatestVersion.Command != "" {
+		cmd := strings.ReplaceAll(src.GetLatestVersion.Command, "{package}", k.Name)
+		res := executil.RunShell(cmd)
+		if res.Code != 0 {
+			return ""
+		}
+		return strings.TrimSpace(res.Stdout)
+	}
 	switch src.Name {
 	case "apt":
 		cmd := fmt.Sprintf("apt-cache policy %s | awk '/Candidate:/ {print $2}'", k.Name)
