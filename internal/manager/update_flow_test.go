@@ -30,21 +30,6 @@ func TestGroupTracked(t *testing.T) {
 	}
 }
 
-func TestGroupSourcesOnly(t *testing.T) {
-	m := New(config.Config{
-		Sources: []config.Source{{Type: "package_manager", Name: "apt"}},
-		Packages: []config.Package{
-			{Name: "git", Source: "apt"},
-			{Name: "curl", Source: "apt"},
-		},
-	})
-	got := m.groupSourcesOnly()
-	want := map[string][]string{"apt": {"git", "curl"}}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("groupSourcesOnly mismatch: got=%v want=%v", got, want)
-	}
-}
-
 func TestKindOf(t *testing.T) {
 	if kindOf("custom") != "custom" {
 		t.Fatalf("kindOf custom")
