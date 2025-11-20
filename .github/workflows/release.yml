@@ -111,27 +111,47 @@ jobs:
           path: ${{ steps.build.outputs.binary }}
           if-no-files-found: error
 
-      - name: Generate checksums
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          cd dist
-          shopt -s nullglob
-          files=( *.tar.gz *.zip )
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No archives to checksum"
-            exit 0
-          fi
-          sha256sum "${files[@]}" > checksums.txt
+      - name: Generate Linux checksums
+        if: startsWith(github.ref, 'refs/tags/') && matrix.goos == 'linux'
+        run: (cd dist && sha256sum *.tar.gz) > dist/checksums.txt
 
-      - name: Upload release assets
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Generate Windows checksums
+        if: startsWith(github.ref, 'refs/tags/') && matrix.goos == 'windows'
+        run: (cd dist && sha256sum *.zip *.exe) > dist/checksums.txt
+
+      - name: Generate macOS checksums
+        if: startsWith(github.ref, 'refs/tags/') && matrix.goos == 'darwin'
+        run: (cd dist && sha256sum *.zip) > dist/checksums.txt
+
+      - name: Upload Linux release assets
+        if: startsWith(github.ref, 'refs/tags/') && matrix.goos == 'linux'
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.tar.gz
+            dist/checksums.txt
+          fail_on_unmatched_files: true
+          overwrite_files: true
+
+      - name: Upload Windows release assets
+        if: startsWith(github.ref, 'refs/tags/') && matrix.goos == 'windows'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
             dist/*.zip
             dist/*.exe
             dist/checksums.txt
           fail_on_unmatched_files: true
+          overwrite_files: true
+
+      - name: Upload macOS release assets
+        if: startsWith(github.ref, 'refs/tags/') && matrix.goos == 'darwin'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.zip
+            dist/checksums.txt
+          fail_on_unmatched_files: true
+          overwrite_files: true
 
           
