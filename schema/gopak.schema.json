@@ -11,14 +11,13 @@
         "properties": {
           "type": { "type": "string" },
           "name": { "type": "string" },
-          "install": { "$ref": "#/definitions/command" },
-          "remove": { "$ref": "#/definitions/command" },
-          "update": { "$ref": "#/definitions/command" },
-          "search": { "$ref": "#/definitions/command" },
-          "outdated": { "$ref": "#/definitions/command" },
-          "pre_update": { "$ref": "#/definitions/command" },
           "get_installed_version": { "$ref": "#/definitions/command" },
-          "get_latest_version": { "$ref": "#/definitions/command" }
+          "get_latest_version": { "$ref": "#/definitions/command" },
+          "install": { "$ref": "#/definitions/command" },
+          "pre_update": { "$ref": "#/definitions/command" },
+          "update": { "$ref": "#/definitions/command" },
+          "remove": { "$ref": "#/definitions/command" },
+          "search": { "$ref": "#/definitions/command" }
         },
         "required": ["type", "name"],
         "additionalProperties": false
@@ -50,12 +49,11 @@
             "type": "array",
             "items": { "type": "string" }
           },
-          "get_latest_version": { "$ref": "#/definitions/command" },
           "get_installed_version": { "$ref": "#/definitions/command" },
-          "compare_versions": { "$ref": "#/definitions/command" },
-          "download": { "$ref": "#/definitions/command" },
-          "remove": { "$ref": "#/definitions/command" },
-          "install": { "$ref": "#/definitions/command" }
+          "get_latest_version": { "$ref": "#/definitions/command" },
+          "install": { "$ref": "#/definitions/command" },
+          "update": { "$ref": "#/definitions/command" },
+          "remove": { "$ref": "#/definitions/command" }
         },
         "required": ["name"],
         "additionalProperties": false

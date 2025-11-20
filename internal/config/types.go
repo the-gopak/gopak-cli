@@ -13,7 +13,6 @@ type Source struct {
 	Remove              Command `mapstructure:"remove" yaml:"remove" json:"remove"`
 	Update              Command `mapstructure:"update" yaml:"update" json:"update"`
 	Search              Command `mapstructure:"search" yaml:"search" json:"search"`
-	Outdated            Command `mapstructure:"outdated" yaml:"outdated" json:"outdated"`
 	PreUpdate           Command `mapstructure:"pre_update" yaml:"pre_update" json:"pre_update"`
 	GetInstalledVersion Command `mapstructure:"get_installed_version" yaml:"get_installed_version" json:"get_installed_version"`
 	GetLatestVersion    Command `mapstructure:"get_latest_version" yaml:"get_latest_version" json:"get_latest_version"`
@@ -28,12 +27,11 @@ type Package struct {
 type CustomPackage struct {
 	Name                string   `mapstructure:"name" yaml:"name" json:"name"`
 	DependsOn           []string `mapstructure:"depends_on" yaml:"depends_on" json:"depends_on,omitempty"`
-	GetLatestVersion    Command  `mapstructure:"get_latest_version" yaml:"get_latest_version" json:"get_latest_version"`
 	GetInstalledVersion Command  `mapstructure:"get_installed_version" yaml:"get_installed_version" json:"get_installed_version"`
-	CompareVersions     Command  `mapstructure:"compare_versions" yaml:"compare_versions" json:"compare_versions"`
-	Download            Command  `mapstructure:"download" yaml:"download" json:"download"`
-	Remove              Command  `mapstructure:"remove" yaml:"remove" json:"remove"`
+	GetLatestVersion    Command  `mapstructure:"get_latest_version" yaml:"get_latest_version" json:"get_latest_version"`
 	Install             Command  `mapstructure:"install" yaml:"install" json:"install"`
+	Update              Command  `mapstructure:"update" yaml:"update" json:"update"`
+	Remove              Command  `mapstructure:"remove" yaml:"remove" json:"remove"`
 }
 
 type Config struct {
@@ -44,14 +42,14 @@ type Config struct {
 
 type Command struct {
 	Command     string `mapstructure:"command" yaml:"command" json:"command"`
-	RequireRoot *bool  `mapstructure:"require_root" yaml:"require_root" json:"require_root,omitempty"`
+	RequireRoot bool   `mapstructure:"require_root" yaml:"require_root" json:"require_root"`
 }
 
 func (c *Command) UnmarshalYAML(value *yaml.Node) error {
 	switch value.Kind {
 	case yaml.ScalarNode:
 		c.Command = value.Value
-		c.RequireRoot = nil
+		c.RequireRoot = false
 		return nil
 	case yaml.MappingNode:
 		var aux struct {
@@ -62,7 +60,11 @@ func (c *Command) UnmarshalYAML(value *yaml.Node) error {
 			return err
 		}
 		c.Command = aux.Command
-		c.RequireRoot = aux.RequireRoot
+		if aux.RequireRoot != nil {
+			c.RequireRoot = *aux.RequireRoot
+		} else {
+			c.RequireRoot = false
+		}
 		return nil
 	default:
 		return fmt.Errorf("invalid command node kind: %d", value.Kind)

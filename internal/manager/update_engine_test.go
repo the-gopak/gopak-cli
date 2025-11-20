@@ -8,7 +8,7 @@ import (
 
 type mockRunner struct{ calls []string }
 
-func (r *mockRunner) Run(name, step, script string, require *bool) error {
+func (r *mockRunner) Run(name, step string, cmd config.Command) error {
 	r.calls = append(r.calls, name+":"+step)
 	return nil
 }

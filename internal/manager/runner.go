@@ -7,10 +7,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gopak/gopak-cli/internal/config"
 )
 
 type Runner interface {
-	Run(name, step, script string, require *bool) error
+	Run(name, step string, cmd config.Command) error
 	Close() error
 }
 
@@ -63,24 +65,20 @@ func (r *SudoRunner) ensureRootAccess() bool {
 	return true
 }
 
-func (r *SudoRunner) Run(name, step, script string, require *bool) error {
-	needRoot := false
-	if require != nil && *require {
-		needRoot = true
-	}
-	final := script
-	if needRoot {
+func (r *SudoRunner) Run(name, step string, cmd config.Command) error {
+	final := cmd.Command
+	if cmd.RequireRoot {
 		if !r.ensureRootAccess() {
 			return fmt.Errorf("sudo auth not granted for %s [%s]", name, step)
 		}
 
-		esc := strings.ReplaceAll(script, "'", "'\"'\"'")
+		esc := strings.ReplaceAll(final, "'", "'\"'\"'")
 		final = fmt.Sprintf("sudo -n bash -ceu '%s'", esc)
 	}
-	cmd := exec.Command("bash", "-ceu", final)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	bcmd := exec.Command("bash", "-ceu", final)
+	bcmd.Stdout = os.Stdout
+	bcmd.Stderr = os.Stderr
+	if err := bcmd.Run(); err != nil {
 		return fmt.Errorf("command failed for %s [%s]", name, step)
 	}
 	return nil

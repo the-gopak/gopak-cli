@@ -1,45 +1,10 @@
 package manager
 
 import (
-	"github.com/gopak/gopak-cli/internal/config"
-	"os"
 	"testing"
+
+	"github.com/gopak/gopak-cli/internal/config"
 )
-
-func boolPtr(b bool) *bool { return &b }
-
-func TestEnsureRoot_RequireFalse_NoError(t *testing.T) {
-	req := boolPtr(false)
-	if err := ensureRoot("pkg", "step", req); err != nil {
-		t.Fatalf("expected no error when require_root is false, got: %v", err)
-	}
-}
-
-func TestEnsureRoot_DefaultOrTrue(t *testing.T) {
-	euid := os.Geteuid()
-
-	t.Run("require=nil default false", func(t *testing.T) {
-		var req *bool
-		err := ensureRoot("pkg", "step", req)
-		if err != nil {
-			t.Fatalf("expected nil error when require_root defaults to false, got %v", err)
-		}
-	})
-
-	t.Run("require=true", func(t *testing.T) {
-		req := boolPtr(true)
-		err := ensureRoot("pkg", "step", req)
-		if euid == 0 {
-			if err != nil {
-				t.Fatalf("expected nil error for root, got %v", err)
-			}
-		} else {
-			if err == nil {
-				t.Fatalf("expected error for non-root when require_root=true")
-			}
-		}
-	})
-}
 
 func TestResolveOrder(t *testing.T) {
 	cfg := config.Config{

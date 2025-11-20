@@ -121,7 +121,7 @@ sources:
       command: "s {query}"
 `), 0o644)
 
-    defaults := []byte(`
+	defaults := []byte(`
 sources:
   - type: package_manager
     name: apt
@@ -131,48 +131,48 @@ sources:
       command: "apt remove {package_list}"
 `)
 
-    cfg, err := LoadDefaultsAndFiles(defaults, []string{f})
-    if err != nil {
-        t.Fatalf("unexpected err: %v", err)
-    }
-    if len(cfg.Sources) != 1 {
-        t.Fatalf("want 1 source, got %d", len(cfg.Sources))
-    }
-    s := cfg.Sources[0]
-    if s.Name != "apt" {
-        t.Fatalf("unexpected name: %s", s.Name)
-    }
-    if s.Type != "package_manager" {
-        t.Fatalf("type not preserved from defaults: %s", s.Type)
-    }
-    if s.Install.Command != "custom i {package_list}" {
-        t.Fatalf("install command not overridden: %s", s.Install.Command)
-    }
-    if s.Install.RequireRoot == nil || *s.Install.RequireRoot != true {
-        t.Fatalf("require_root not set true")
-    }
-    if s.Remove.Command != "apt remove {package_list}" {
-        t.Fatalf("remove lost from defaults: %s", s.Remove.Command)
-    }
+	cfg, err := LoadDefaultsAndFiles(defaults, []string{f})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(cfg.Sources) != 1 {
+		t.Fatalf("want 1 source, got %d", len(cfg.Sources))
+	}
+	s := cfg.Sources[0]
+	if s.Name != "apt" {
+		t.Fatalf("unexpected name: %s", s.Name)
+	}
+	if s.Type != "package_manager" {
+		t.Fatalf("type not preserved from defaults: %s", s.Type)
+	}
+	if s.Install.Command != "custom i {package_list}" {
+		t.Fatalf("install command not overridden: %s", s.Install.Command)
+	}
+	if !s.Install.RequireRoot {
+		t.Fatalf("require_root not set true")
+	}
+	if s.Remove.Command != "apt remove {package_list}" {
+		t.Fatalf("remove lost from defaults: %s", s.Remove.Command)
+	}
 }
 
 // packages overlay is not supported anymore; duplicates must error, so no test here
 
 func TestLoadDefaultsAndFiles_DefaultsOnly(t *testing.T) {
-    defaults := []byte(`
+	defaults := []byte(`
 sources:
   - name: snap
     type: package_manager
     install:
       command: "snap i {package_list}"
 `)
-    cfg, err := LoadDefaultsAndFiles(defaults, nil)
-    if err != nil {
-        t.Fatalf("unexpected err: %v", err)
-    }
-    if len(cfg.Sources) != 1 || cfg.Sources[0].Name != "snap" {
-        t.Fatalf("defaults not loaded correctly")
-    }
+	cfg, err := LoadDefaultsAndFiles(defaults, nil)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(cfg.Sources) != 1 || cfg.Sources[0].Name != "snap" {
+		t.Fatalf("defaults not loaded correctly")
+	}
 }
 
 func TestLoadFromFiles_DuplicateSource(t *testing.T) {

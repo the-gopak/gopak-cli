@@ -149,7 +149,6 @@ func mergeSource(a, b Source) Source {
 	out.Remove = mergeCommand(out.Remove, b.Remove)
 	out.Update = mergeCommand(out.Update, b.Update)
 	out.Search = mergeCommand(out.Search, b.Search)
-	out.Outdated = mergeCommand(out.Outdated, b.Outdated)
 	out.PreUpdate = mergeCommand(out.PreUpdate, b.PreUpdate)
 	out.GetInstalledVersion = mergeCommand(out.GetInstalledVersion, b.GetInstalledVersion)
 	out.GetLatestVersion = mergeCommand(out.GetLatestVersion, b.GetLatestVersion)
@@ -163,8 +162,6 @@ func mergeCustomPackage(a, b CustomPackage) CustomPackage {
 	}
 	out.GetLatestVersion = mergeCommand(out.GetLatestVersion, b.GetLatestVersion)
 	out.GetInstalledVersion = mergeCommand(out.GetInstalledVersion, b.GetInstalledVersion)
-	out.CompareVersions = mergeCommand(out.CompareVersions, b.CompareVersions)
-	out.Download = mergeCommand(out.Download, b.Download)
 	out.Remove = mergeCommand(out.Remove, b.Remove)
 	out.Install = mergeCommand(out.Install, b.Install)
 	return out
@@ -175,9 +172,7 @@ func mergeCommand(a, b Command) Command {
 	if b.Command != "" {
 		out.Command = b.Command
 	}
-	if b.RequireRoot != nil {
-		out.RequireRoot = b.RequireRoot
-	}
+	out.RequireRoot = b.RequireRoot
 	return out
 }
 

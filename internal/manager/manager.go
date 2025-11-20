@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,7 +39,7 @@ func (m *Manager) ensurePreUpdate(src config.Source) {
 		return
 	}
 	logging.Debug(fmt.Sprintf("%s [pre_update]: %s", src.Name, src.PreUpdate.Command))
-	res := executil.RunShell(src.PreUpdate.Command)
+	res := executil.RunShell(src.PreUpdate)
 	if res.Code != 0 {
 		logging.Debug(fmt.Sprintf("%s [pre_update failed]: exit=%d", src.Name, res.Code))
 	}
@@ -116,22 +115,6 @@ func splitNumeric(s string) []int {
 	return out
 }
 
-// ensureRoot preserves compatibility with existing unit tests.
-// It checks if root is required for a step and if the current EUID is 0.
-func ensureRoot(name, step string, require *bool) error {
-	need := false
-	if require != nil && *require {
-		need = true
-	}
-	if !need {
-		return nil
-	}
-	if os.Geteuid() != 0 {
-		return fmt.Errorf("root required for %s [%s]. Re-run as root (e.g., with sudo) or set require_root: true only when needed.", name, step)
-	}
-	return nil
-}
-
 func New(cfg config.Config) *Manager { return &Manager{cfg: cfg} }
 
 func (m *Manager) Install(name string) error {
@@ -143,20 +126,15 @@ func (m *Manager) Install(name string) error {
 	for _, n := range plan {
 		if m.isCustom(n) {
 			cp := m.customByName(n)
-			if cp.Download.Command != "" {
-				if err := m.runCtx(n, "download", cp.Download.Command, cp.Download.RequireRoot); err != nil {
-					return err
-				}
-			}
 			if cp.Remove.Command != "" {
-				if err := m.runCtx(n, "remove-before-install", cp.Remove.Command, cp.Remove.RequireRoot); err != nil {
+				if err := m.runCtx(n, "remove-before-install", cp.Remove); err != nil {
 					return err
 				}
 			}
 			if cp.Install.Command == "" {
 				return fmt.Errorf("missing install script for custom package: %s", n)
 			}
-			if err := m.runCtx(n, "install", cp.Install.Command, cp.Install.RequireRoot); err != nil {
+			if err := m.runCtx(n, "install", cp.Install); err != nil {
 				return err
 			}
 			logging.Success("installed: " + n)
@@ -164,7 +142,7 @@ func (m *Manager) Install(name string) error {
 			p := m.pkgByName(n)
 			s := m.sourceByName(p.Source)
 			cmd := strings.ReplaceAll(s.Install.Command, "{package_list}", n)
-			if err := m.runCtx(n, "install", cmd, s.Install.RequireRoot); err != nil {
+			if err := m.runCtx(n, "install", config.Command{Command: cmd, RequireRoot: s.Install.RequireRoot}); err != nil {
 				return err
 			}
 			logging.Success("installed: " + n)
@@ -179,12 +157,12 @@ func (m *Manager) Remove(name string) error {
 		if cp.Remove.Command == "" {
 			return fmt.Errorf("missing remove script for custom package: %s", name)
 		}
-		return m.runCtx(name, "remove", cp.Remove.Command, cp.Remove.RequireRoot)
+		return m.runCtx(name, "remove", cp.Remove)
 	}
 	p := m.pkgByName(name)
 	s := m.sourceByName(p.Source)
 	cmd := strings.ReplaceAll(s.Remove.Command, "{package_list}", name)
-	return m.runCtx(name, "remove", cmd, s.Remove.RequireRoot)
+	return m.runCtx(name, "remove", config.Command{Command: cmd, RequireRoot: s.Remove.RequireRoot})
 }
 
 func (m *Manager) UpdateOne(name string) error {
@@ -195,7 +173,7 @@ func (m *Manager) UpdateOne(name string) error {
 	p := m.pkgByName(name)
 	s := m.sourceByName(p.Source)
 	cmd := strings.ReplaceAll(s.Update.Command, "{package_list}", name)
-	if err := m.runCtx(name, "update", cmd, s.Update.RequireRoot); err != nil {
+	if err := m.runCtx(name, "update", config.Command{Command: cmd, RequireRoot: s.Update.RequireRoot}); err != nil {
 		return err
 	}
 	logging.Success("updated: " + name)
@@ -212,7 +190,7 @@ func (m *Manager) List() error {
 	for _, cp := range m.cfg.CustomPackages {
 		v := ""
 		if cp.GetInstalledVersion.Command != "" {
-			res := executil.RunShell(cp.GetInstalledVersion.Command)
+			res := executil.RunShell(cp.GetInstalledVersion)
 			v = strings.TrimSpace(res.Stdout)
 		}
 		if v == "" {
@@ -230,7 +208,7 @@ func (m *Manager) Search(query string) error {
 		}
 		cmd := strings.ReplaceAll(s.Search.Command, "{query}", query)
 		logging.Debug(fmt.Sprintf("%s [search]: %s", s.Name, cmd))
-		res := executil.RunShell(cmd)
+		res := executil.RunShell(config.Command{Command: cmd, RequireRoot: s.Search.RequireRoot})
 		if res.Stdout != "" {
 			fmt.Print(res.Stdout)
 		}
@@ -247,7 +225,7 @@ func (m *Manager) updateCustom(cp config.CustomPackage) error {
 	installed := ""
 
 	if cp.GetLatestVersion.Command != "" {
-		res := executil.RunShell(cp.GetLatestVersion.Command)
+		res := executil.RunShell(cp.GetLatestVersion)
 		if res.Code != 0 {
 			return fmt.Errorf("command failed for %s [get_latest_version]: exit %d\n%s", cp.Name, res.Code, res.Stderr)
 		}
@@ -255,43 +233,24 @@ func (m *Manager) updateCustom(cp config.CustomPackage) error {
 	}
 	if cp.GetInstalledVersion.Command != "" {
 		logging.Debug(fmt.Sprintf("%s [get_installed_version]: %s", cp.Name, cp.GetInstalledVersion.Command))
-		res := executil.RunShell(cp.GetInstalledVersion.Command)
+		res := executil.RunShell(cp.GetInstalledVersion)
 		if res.Code != 0 {
 			return fmt.Errorf("command failed for %s [get_installed_version]: exit %d\n%s", cp.Name, res.Code, res.Stderr)
 		}
 		installed = strings.TrimSpace(res.Stdout)
 		logging.Debug(fmt.Sprintf("%s [get_installed_version result]: %s", cp.Name, installed))
 	}
-
-	if cp.CompareVersions.Command != "" {
-		script := fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.CompareVersions.Command)
-		res := executil.RunShell(script)
-		if res.Code != 0 {
-			return fmt.Errorf("command failed for %s [compare_versions]: exit %d\n%s", cp.Name, res.Code, res.Stderr)
-		}
-		out := strings.ToLower(strings.TrimSpace(res.Stdout))
-		need = out == "true" || out == "1" || out == "yes"
+	if installed == "" && cp.Install.Command != "" {
+		need = true
+	} else if latest != "" {
+		need = cmpVersion(latest, installed) > 0
 	} else {
-		// Default comparison when no custom comparator is provided
-		// If nothing is installed but install script exists, we need install
-		if installed == "" && cp.Install.Command != "" {
-			need = true
-		} else if latest != "" {
-			need = cmpVersion(latest, installed) > 0
-		} else {
-			need = false
-		}
+		need = false
 	}
 	logging.Debug(fmt.Sprintf("%s versions: latest=%q installed=%q need=%v", cp.Name, latest, installed, need))
 	if need {
-		if cp.Download.Command != "" {
-			dl := fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.Download.Command)
-			if err := m.runCtx(cp.Name, "download", dl, cp.Download.RequireRoot); err != nil {
-				return err
-			}
-		}
 		if cp.Remove.Command != "" {
-			if err := m.runCtx(cp.Name, "remove-before-install", cp.Remove.Command, cp.Remove.RequireRoot); err != nil {
+			if err := m.runCtx(cp.Name, "remove-before-install", cp.Remove); err != nil {
 				return err
 			}
 		}
@@ -299,7 +258,7 @@ func (m *Manager) updateCustom(cp config.CustomPackage) error {
 			return fmt.Errorf("missing install script for custom package: %s", cp.Name)
 		}
 		inst := fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.Install.Command)
-		if err := m.runCtx(cp.Name, "install", inst, cp.Install.RequireRoot); err != nil {
+		if err := m.runCtx(cp.Name, "install", config.Command{Command: inst, RequireRoot: cp.Install.RequireRoot}); err != nil {
 			return err
 		}
 		logging.Success("updated: " + cp.Name)
@@ -381,20 +340,9 @@ func (m *Manager) sourceByName(name string) config.Source {
 	return config.Source{}
 }
 
-func (m *Manager) runCtx(name, step, script string, require *bool) error {
-	needRoot := false
-	if require != nil && *require {
-		needRoot = true
-	}
-	final := script
-	if needRoot && os.Geteuid() != 0 {
-		// Elevate this step only. Important: single-quote the script so the outer bash -u
-		// doesn't expand inner ${vars} before sudo executes.
-		esc := strings.ReplaceAll(script, "'", "'\"'\"'")
-		final = fmt.Sprintf("sudo bash -ceu '%s'", esc)
-	}
-	logging.Debug(fmt.Sprintf("%s [%s]: %s", name, step, final))
-	res := executil.RunShell(final)
+func (m *Manager) runCtx(name string, step string, command config.Command) error {
+	logging.Debug(fmt.Sprintf("%s [%s]: %s", name, step, command.Command))
+	res := executil.RunShell(command)
 	if res.Stdout != "" {
 		fmt.Print(res.Stdout)
 	}

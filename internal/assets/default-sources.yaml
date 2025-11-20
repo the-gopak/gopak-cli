@@ -63,9 +63,6 @@ sources:
     update:
       command: "snap refresh {package_list}"
       require_root: true
-    pre_update:
-      command: "snap refresh"
-      require_root: true
     search:
       command: "snap find {query}"
       require_root: false
@@ -73,7 +70,7 @@ sources:
       command: "snap info {package} | grep '^installed:' | head -n1 | awk '{print $2}'"
       require_root: false
     get_latest_version:
-      command: "snap info {package} | awk '/^latest:/ {print $2}'"
+      command: "snap info {package} | awk '/^latest/ {print $2; exit}'"
       require_root: false
 
   - type: package_manager
@@ -94,8 +91,8 @@ sources:
       command: "flatpak search {query}"
       require_root: false
     get_installed_version:
-      command: "flatpak info {package} | grep '^Version:' | head -n1 | awk '{print $2}'"
+      command: "flatpak info --show-version {package} 2>/dev/null || true"
       require_root: false
     get_latest_version:
-      command: "flatpak info {package} | awk '/^Version:/ {print $2}'"
+      command: "origin=$(flatpak info {package} 2>/dev/null | awk '/^Origin:/ {print $2}' | head -n1); if [ -n \"$origin\" ]; then flatpak remote-info --show-version \"$origin\" {package} 2>/dev/null || true; fi"
       require_root: false

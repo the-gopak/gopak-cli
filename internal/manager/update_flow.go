@@ -10,14 +10,6 @@ import (
 	"github.com/gopak/gopak-cli/internal/executil"
 )
 
-func (m *Manager) groupSourcesOnly() map[string][]string {
-	res := map[string][]string{}
-	for _, p := range m.cfg.Packages {
-		res[p.Source] = append(res[p.Source], p.Name)
-	}
-	return res
-}
-
 func kindOf(group string) string {
 	if group == "custom" {
 		return "custom"
@@ -50,7 +42,7 @@ func (m *Manager) getVersionInstalled(k PackageKey) string {
 		if cp.GetInstalledVersion.Command == "" {
 			return ""
 		}
-		res := executil.RunShell(cp.GetInstalledVersion.Command)
+		res := executil.RunShell(cp.GetInstalledVersion)
 		if res.Code != 0 {
 			return ""
 		}
@@ -62,7 +54,7 @@ func (m *Manager) getVersionInstalled(k PackageKey) string {
 	}
 	if src.GetInstalledVersion.Command != "" {
 		cmd := strings.ReplaceAll(src.GetInstalledVersion.Command, "{package}", k.Name)
-		res := executil.RunShell(cmd)
+		res := executil.RunShell(config.Command{Command: cmd, RequireRoot: src.GetInstalledVersion.RequireRoot})
 		if res.Code != 0 {
 			return ""
 		}
@@ -70,8 +62,8 @@ func (m *Manager) getVersionInstalled(k PackageKey) string {
 	}
 	switch src.Name {
 	case "apt":
-		cmd := fmt.Sprintf("dpkg-query -W -f='${Version}\\n' %s 2>/dev/null || true", k.Name)
-		res := executil.RunShell(cmd)
+		cmd := fmt.Sprintf("dpkg-query -W -f='${Version}\n' %s 2>/dev/null || true", k.Name)
+		res := executil.RunShell(config.Command{Command: cmd})
 		return strings.TrimSpace(res.Stdout)
 	default:
 		return ""
@@ -84,7 +76,7 @@ func (m *Manager) getVersionAvailable(k PackageKey) string {
 		if cp.GetLatestVersion.Command == "" {
 			return ""
 		}
-		res := executil.RunShell(cp.GetLatestVersion.Command)
+		res := executil.RunShell(cp.GetLatestVersion)
 		if res.Code != 0 {
 			return ""
 		}
@@ -98,7 +90,7 @@ func (m *Manager) getVersionAvailable(k PackageKey) string {
 	}
 	if src.GetLatestVersion.Command != "" {
 		cmd := strings.ReplaceAll(src.GetLatestVersion.Command, "{package}", k.Name)
-		res := executil.RunShell(cmd)
+		res := executil.RunShell(config.Command{Command: cmd, RequireRoot: src.GetLatestVersion.RequireRoot})
 		if res.Code != 0 {
 			return ""
 		}
@@ -107,7 +99,7 @@ func (m *Manager) getVersionAvailable(k PackageKey) string {
 	switch src.Name {
 	case "apt":
 		cmd := fmt.Sprintf("apt-cache policy %s | awk '/Candidate:/ {print $2}'", k.Name)
-		res := executil.RunShell(cmd)
+		res := executil.RunShell(config.Command{Command: cmd})
 		return strings.TrimSpace(res.Stdout)
 	default:
 		return ""
@@ -119,53 +111,39 @@ func (m *Manager) updateCustomWithRunner(cp config.CustomPackage, runner Runner)
 	latest := ""
 	installed := ""
 	if cp.GetLatestVersion.Command != "" {
-		res := executil.RunShell(cp.GetLatestVersion.Command)
+		res := executil.RunShell(cp.GetLatestVersion)
 		if res.Code != 0 {
 			return fmt.Errorf("command failed for %s [get_latest_version]: exit %d\n%s", cp.Name, res.Code, res.Stderr)
 		}
 		latest = strings.TrimSpace(res.Stdout)
 	}
 	if cp.GetInstalledVersion.Command != "" {
-		res := executil.RunShell(cp.GetInstalledVersion.Command)
+		res := executil.RunShell(cp.GetInstalledVersion)
 		if res.Code != 0 {
 			return fmt.Errorf("command failed for %s [get_installed_version]: exit %d\n%s", cp.Name, res.Code, res.Stderr)
 		}
 		installed = strings.TrimSpace(res.Stdout)
 	}
-	if cp.CompareVersions.Command != "" {
-		script := fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.CompareVersions.Command)
-		res := executil.RunShell(script)
-		if res.Code != 0 {
-			return fmt.Errorf("command failed for %s [compare_versions]: exit %d\n%s", cp.Name, res.Code, res.Stderr)
-		}
-		out := strings.ToLower(strings.TrimSpace(res.Stdout))
-		need = out == "true" || out == "1" || out == "yes"
+
+	if installed == "" && cp.Install.Command != "" {
+		need = true
+	} else if latest != "" {
+		need = cmpVersion(latest, installed) > 0
 	} else {
-		if installed == "" && cp.Install.Command != "" {
-			need = true
-		} else if latest != "" {
-			need = cmpVersion(latest, installed) > 0
-		} else {
-			need = false
-		}
+		need = false
 	}
+
 	if need {
-		if cp.Download.Command != "" {
-			dl := fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.Download.Command)
-			if err := runner.Run(cp.Name, "download", dl, cp.Download.RequireRoot); err != nil {
-				return err
-			}
-		}
 		if cp.Remove.Command != "" {
-			if err := runner.Run(cp.Name, "remove-before-install", cp.Remove.Command, cp.Remove.RequireRoot); err != nil {
+			if err := runner.Run(cp.Name, "remove-before-install", cp.Remove); err != nil {
 				return err
 			}
 		}
 		if cp.Install.Command == "" {
 			return fmt.Errorf("missing install script for custom package: %s", cp.Name)
 		}
-		inst := fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.Install.Command)
-		if err := runner.Run(cp.Name, "install", inst, cp.Install.RequireRoot); err != nil {
+		instCmd := config.Command{Command: fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.Install.Command), RequireRoot: cp.Install.RequireRoot}
+		if err := runner.Run(cp.Name, "install", instCmd); err != nil {
 			return err
 		}
 		return nil
@@ -217,8 +195,9 @@ func (m *Manager) UpdateSelected(keys []PackageKey, runner Runner, onUpdate func
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			cmd := strings.ReplaceAll(s.Install.Command, "{package_list}", strings.Join(names, " "))
-			err := runner.Run(src, "install-group", cmd, s.Install.RequireRoot)
+			cmdStr := strings.ReplaceAll(s.Install.Command, "{package_list}", strings.Join(names, " "))
+			cmd := config.Command{Command: cmdStr, RequireRoot: s.Install.RequireRoot}
+			err := runner.Run(src, "install-group", cmd)
 			for _, n := range names {
 				ok := err == nil
 				msg := "installed"
@@ -244,8 +223,9 @@ func (m *Manager) UpdateSelected(keys []PackageKey, runner Runner, onUpdate func
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			cmd := strings.ReplaceAll(s.Update.Command, "{package_list}", strings.Join(names, " "))
-			err := runner.Run(src, "update-group", cmd, s.Update.RequireRoot)
+			cmdStr := strings.ReplaceAll(s.Update.Command, "{package_list}", strings.Join(names, " "))
+			cmd := config.Command{Command: cmdStr, RequireRoot: s.Update.RequireRoot}
+			err := runner.Run(src, "update-group", cmd)
 			for _, n := range names {
 				ok := err == nil
 				msg := "updated"
