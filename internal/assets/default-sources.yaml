@@ -70,7 +70,7 @@ sources:
       command: "snap info {package} | grep '^installed:' | head -n1 | awk '{print $2}'"
       require_root: false
     get_latest_version:
-      command: "snap info {package} | awk '/^latest/ {print $2; exit}'"
+      command: "tracking=$(snap info {package} | awk -F':' '/^tracking/ {gsub(/^[ \t]+/,\"\",$2); gsub(/[ \t]+$/,\"\",$2); print $2; exit}'); snap info {package} | awk -v t=\"$tracking\" '$1 == t\":\" {print $2; exit}'"
       require_root: false
 
   - type: package_manager
@@ -91,8 +91,8 @@ sources:
       command: "flatpak search {query}"
       require_root: false
     get_installed_version:
-      command: "flatpak info --show-version {package} 2>/dev/null || true"
+      command: "flatpak info {package} 2>/dev/null | sed -n 's/^[[:space:]]*Version:[[:space:]]*//p' | head -n1 || true"
       require_root: false
     get_latest_version:
-      command: "origin=$(flatpak info {package} 2>/dev/null | awk '/^Origin:/ {print $2}' | head -n1); if [ -n \"$origin\" ]; then flatpak remote-info --show-version \"$origin\" {package} 2>/dev/null || true; fi"
+      command: "origin=$(flatpak info {package} 2>/dev/null | sed -n 's/^[[:space:]]*Origin:[[:space:]]*//p' | head -n1); if [ -n \"$origin\" ]; then flatpak remote-info \"$origin\" {package} 2>/dev/null | sed -n 's/^[[:space:]]*Version:[[:space:]]*//p' | head -n1; fi || true"
       require_root: false
