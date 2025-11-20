@@ -100,14 +100,14 @@ jobs:
       - name: Upload artifact (CI visibility)
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.build.outputs.archive }}
+          name: gopak-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.arm_suffix }}-archive
           path: ${{ steps.build.outputs.archive }}
           if-no-files-found: error
 
       - name: Upload binary artifact (CI visibility)
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.build.outputs.binary }}
+          name: gopak-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.arm_suffix }}-binary
           path: ${{ steps.build.outputs.binary }}
           if-no-files-found: error
 
@@ -126,3 +126,5 @@ jobs:
             dist/*.exe
             dist/checksums.txt
           fail_on_unmatched_files: true
+
+          
