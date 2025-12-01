@@ -45,7 +45,7 @@ func TestUpdateSelected_Custom_NoNeed(t *testing.T) {
 		Name:                "go",
 		GetInstalledVersion: config.Command{Command: "echo 1.0.0"},
 		GetLatestVersion:    config.Command{Command: "echo 1.0.0"},
-		Install:             config.Command{Command: "echo install"},
+		Update:              config.Command{Command: "echo update"},
 	}}}
 	m := New(cfg)
 	run := &mockRunner{}
@@ -63,7 +63,7 @@ func TestUpdateSelected_Custom_Proceed(t *testing.T) {
 		Name:                "tool",
 		GetInstalledVersion: config.Command{Command: "echo 0.9.0"},
 		GetLatestVersion:    config.Command{Command: "echo 1.0.0"},
-		Install:             config.Command{Command: "echo install"},
+		Update:              config.Command{Command: "echo update"},
 	}}}
 	m := New(cfg)
 	run := &mockRunner{}
@@ -73,5 +73,77 @@ func TestUpdateSelected_Custom_Proceed(t *testing.T) {
 	}
 	if len(run.calls) == 0 {
 		t.Fatalf("runner should be called on update needed")
+	}
+}
+
+func TestUpdateSelected_Custom_NoUpdateCommand(t *testing.T) {
+	cfg := config.Config{CustomPackages: []config.CustomPackage{{
+		Name:                "tool",
+		GetInstalledVersion: config.Command{Command: "echo 0.9.0"},
+		GetLatestVersion:    config.Command{Command: "echo 1.0.0"},
+		Install:             config.Command{Command: "echo install"},
+	}}}
+	m := New(cfg)
+	run := &mockRunner{}
+	key := PackageKey{Source: "custom", Name: "tool", Kind: "custom"}
+	if err := m.UpdateSelected([]PackageKey{key}, run, nil); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if len(run.calls) != 0 {
+		t.Fatalf("runner should not be called when no update command, got %v", run.calls)
+	}
+}
+
+func TestUpdateSelected_Custom_NotInstalled(t *testing.T) {
+	cfg := config.Config{CustomPackages: []config.CustomPackage{{
+		Name:                "tool",
+		GetInstalledVersion: config.Command{Command: "echo ''"},
+		GetLatestVersion:    config.Command{Command: "echo 1.0.0"},
+		Update:              config.Command{Command: "echo update"},
+	}}}
+	m := New(cfg)
+	run := &mockRunner{}
+	key := PackageKey{Source: "custom", Name: "tool", Kind: "custom"}
+	if err := m.UpdateSelected([]PackageKey{key}, run, nil); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if len(run.calls) != 0 {
+		t.Fatalf("runner should not be called for uninstalled package, got %v", run.calls)
+	}
+}
+
+func TestInstallSelected_Custom(t *testing.T) {
+	cfg := config.Config{CustomPackages: []config.CustomPackage{{
+		Name:                "tool",
+		GetInstalledVersion: config.Command{Command: "echo ''"},
+		GetLatestVersion:    config.Command{Command: "echo 1.0.0"},
+		Install:             config.Command{Command: "echo install"},
+	}}}
+	m := New(cfg)
+	run := &mockRunner{}
+	key := PackageKey{Source: "custom", Name: "tool", Kind: "custom"}
+	if err := m.InstallSelected([]PackageKey{key}, run, nil); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if len(run.calls) == 0 {
+		t.Fatalf("runner should be called for install")
+	}
+}
+
+func TestInstallSelected_Custom_AlreadyInstalled(t *testing.T) {
+	cfg := config.Config{CustomPackages: []config.CustomPackage{{
+		Name:                "tool",
+		GetInstalledVersion: config.Command{Command: "echo 1.0.0"},
+		GetLatestVersion:    config.Command{Command: "echo 1.0.0"},
+		Install:             config.Command{Command: "echo install"},
+	}}}
+	m := New(cfg)
+	run := &mockRunner{}
+	key := PackageKey{Source: "custom", Name: "tool", Kind: "custom"}
+	if err := m.InstallSelected([]PackageKey{key}, run, nil); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if len(run.calls) != 0 {
+		t.Fatalf("runner should not be called for already installed package, got %v", run.calls)
 	}
 }

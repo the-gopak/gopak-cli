@@ -107,7 +107,9 @@ func (m *Manager) getVersionAvailable(k PackageKey) string {
 }
 
 func (m *Manager) updateCustomWithRunner(cp config.CustomPackage, runner Runner) error {
-	need := false
+	if cp.Update.Command == "" {
+		return nil
+	}
 	latest := ""
 	installed := ""
 	if cp.GetLatestVersion.Command != "" {
@@ -125,28 +127,20 @@ func (m *Manager) updateCustomWithRunner(cp config.CustomPackage, runner Runner)
 		installed = strings.TrimSpace(res.Stdout)
 	}
 
-	if installed == "" && cp.Install.Command != "" {
-		need = true
-	} else if latest != "" {
+	if installed == "" {
+		return nil
+	}
+
+	need := false
+	if latest != "" {
 		need = cmpVersion(latest, installed) > 0
-	} else {
-		need = false
 	}
 
 	if need {
-		if cp.Remove.Command != "" {
-			if err := runner.Run(cp.Name, "remove-before-install", cp.Remove); err != nil {
-				return err
-			}
-		}
-		if cp.Install.Command == "" {
-			return fmt.Errorf("missing install script for custom package: %s", cp.Name)
-		}
-		instCmd := config.Command{Command: fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.Install.Command), RequireRoot: cp.Install.RequireRoot}
-		if err := runner.Run(cp.Name, "install", instCmd); err != nil {
+		updCmd := config.Command{Command: fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.Update.Command), RequireRoot: cp.Update.RequireRoot}
+		if err := runner.Run(cp.Name, "update", updCmd); err != nil {
 			return err
 		}
-		return nil
 	}
 	return nil
 }
@@ -164,53 +158,17 @@ func (m *Manager) Tracked() map[string][]string {
 }
 
 func (m *Manager) UpdateSelected(keys []PackageKey, runner Runner, onUpdate func(PackageKey, bool, string)) error {
-	bySrcInstall := map[string][]string{}
 	bySrcUpdate := map[string][]string{}
 	customSet := map[string]struct{}{}
-	// classify per package
 	for _, k := range keys {
 		if k.Kind == "custom" {
 			customSet[k.Name] = struct{}{}
 			continue
 		}
-		installed := m.getVersionInstalled(k)
-		if installed == "" {
-			bySrcInstall[k.Source] = append(bySrcInstall[k.Source], k.Name)
-		} else {
-			bySrcUpdate[k.Source] = append(bySrcUpdate[k.Source], k.Name)
-		}
+		bySrcUpdate[k.Source] = append(bySrcUpdate[k.Source], k.Name)
 	}
 
 	var wg sync.WaitGroup
-	// run installs per source
-	for src, names := range bySrcInstall {
-		src, names := src, append([]string{}, names...)
-		s := m.sourceByName(src)
-		if len(names) == 0 || s.Name == "" {
-			continue
-		}
-		if s.Install.Command == "" {
-			return fmt.Errorf("missing install command for source: %s", src)
-		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			cmdStr := strings.ReplaceAll(s.Install.Command, "{package_list}", strings.Join(names, " "))
-			cmd := config.Command{Command: cmdStr, RequireRoot: s.Install.RequireRoot}
-			err := runner.Run(src, "install-group", cmd)
-			for _, n := range names {
-				ok := err == nil
-				msg := "installed"
-				if err != nil {
-					msg = err.Error()
-				}
-				if onUpdate != nil {
-					onUpdate(PackageKey{Source: src, Name: n, Kind: kindOf(src)}, ok, msg)
-				}
-			}
-		}()
-	}
-	// run updates per source
 	for src, names := range bySrcUpdate {
 		src, names := src, append([]string{}, names...)
 		s := m.sourceByName(src)
@@ -218,7 +176,7 @@ func (m *Manager) UpdateSelected(keys []PackageKey, runner Runner, onUpdate func
 			continue
 		}
 		if s.Update.Command == "" {
-			return fmt.Errorf("missing update command for source: %s", src)
+			continue
 		}
 		wg.Add(1)
 		go func() {
@@ -238,7 +196,6 @@ func (m *Manager) UpdateSelected(keys []PackageKey, runner Runner, onUpdate func
 			}
 		}()
 	}
-	// custom
 	for name := range customSet {
 		name := name
 		wg.Add(1)

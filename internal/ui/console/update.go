@@ -79,7 +79,6 @@ func (c *ConsoleUI) Update() error {
 	for _, k := range keysAll {
 		s := status[k]
 		if s.Installed == "" {
-			need = append(need, k)
 			continue
 		}
 		if s.Available != "" && s.Installed != s.Available {
@@ -97,16 +96,7 @@ func (c *ConsoleUI) Update() error {
 	labelByKey := map[string]manager.PackageKey{}
 	for _, k := range need {
 		s := status[k]
-		var lbl string
-		if s.Installed == "" {
-			if s.Available != "" {
-				lbl = fmt.Sprintf("%s/%s install %s", k.Source, k.Name, s.Available)
-			} else {
-				lbl = fmt.Sprintf("%s/%s install", k.Source, k.Name)
-			}
-		} else {
-			lbl = fmt.Sprintf("%s/%s %s -> %s", k.Source, k.Name, s.Installed, s.Available)
-		}
+		lbl := fmt.Sprintf("%s/%s %s -> %s", k.Source, k.Name, s.Installed, s.Available)
 		labels = append(labels, lbl)
 		labelByKey[lbl] = k
 	}
