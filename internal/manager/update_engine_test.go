@@ -147,3 +147,46 @@ func TestInstallSelected_Custom_AlreadyInstalled(t *testing.T) {
 		t.Fatalf("runner should not be called for already installed package, got %v", run.calls)
 	}
 }
+
+func TestHasCommand(t *testing.T) {
+	cfg := config.Config{
+		Sources: []config.Source{{
+			Name:    "apt",
+			Install: config.Command{Command: "apt install"},
+			Update:  config.Command{Command: "apt upgrade"},
+		}, {
+			Name:    "snap",
+			Install: config.Command{Command: "snap install"},
+		}},
+		CustomPackages: []config.CustomPackage{{
+			Name:    "tool",
+			Install: config.Command{Command: "echo install"},
+		}, {
+			Name:   "other",
+			Update: config.Command{Command: "echo update"},
+		}},
+	}
+	m := New(cfg)
+
+	cases := []struct {
+		key  PackageKey
+		op   Operation
+		want bool
+	}{
+		{PackageKey{Source: "apt", Name: "git", Kind: "source"}, OpInstall, true},
+		{PackageKey{Source: "apt", Name: "git", Kind: "source"}, OpUpdate, true},
+		{PackageKey{Source: "snap", Name: "code", Kind: "source"}, OpInstall, true},
+		{PackageKey{Source: "snap", Name: "code", Kind: "source"}, OpUpdate, false},
+		{PackageKey{Source: "custom", Name: "tool", Kind: "custom"}, OpInstall, true},
+		{PackageKey{Source: "custom", Name: "tool", Kind: "custom"}, OpUpdate, false},
+		{PackageKey{Source: "custom", Name: "other", Kind: "custom"}, OpInstall, false},
+		{PackageKey{Source: "custom", Name: "other", Kind: "custom"}, OpUpdate, true},
+		{PackageKey{Source: "unknown", Name: "x", Kind: "source"}, OpInstall, false},
+	}
+	for _, tc := range cases {
+		got := m.HasCommand(tc.key, tc.op)
+		if got != tc.want {
+			t.Errorf("HasCommand(%v, %v) = %v, want %v", tc.key, tc.op, got, tc.want)
+		}
+	}
+}

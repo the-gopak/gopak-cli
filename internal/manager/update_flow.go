@@ -10,7 +10,14 @@ import (
 	"github.com/gopak/gopak-cli/internal/executil"
 )
 
-func kindOf(group string) string {
+type Operation string
+
+const (
+	OpInstall Operation = "install"
+	OpUpdate  Operation = "update"
+)
+
+func KindOf(group string) string {
 	if group == "custom" {
 		return "custom"
 	}
@@ -60,14 +67,7 @@ func (m *Manager) getVersionInstalled(k PackageKey) string {
 		}
 		return strings.TrimSpace(res.Stdout)
 	}
-	switch src.Name {
-	case "apt":
-		cmd := fmt.Sprintf("dpkg-query -W -f='${Version}\n' %s 2>/dev/null || true", k.Name)
-		res := executil.RunShell(config.Command{Command: cmd})
-		return strings.TrimSpace(res.Stdout)
-	default:
-		return ""
-	}
+	return ""
 }
 
 func (m *Manager) getVersionAvailable(k PackageKey) string {
@@ -96,20 +96,24 @@ func (m *Manager) getVersionAvailable(k PackageKey) string {
 		}
 		return strings.TrimSpace(res.Stdout)
 	}
-	switch src.Name {
-	case "apt":
-		cmd := fmt.Sprintf("apt-cache policy %s | awk '/Candidate:/ {print $2}'", k.Name)
-		res := executil.RunShell(config.Command{Command: cmd})
-		return strings.TrimSpace(res.Stdout)
-	default:
-		return ""
-	}
+	return ""
 }
 
-func (m *Manager) updateCustomWithRunner(cp config.CustomPackage, runner Runner) error {
-	if cp.Update.Command == "" {
+func (m *Manager) executeCustomWithRunner(cp config.CustomPackage, op Operation, runner Runner) error {
+	var cmd config.Command
+	switch op {
+	case OpInstall:
+		cmd = cp.Install
+	case OpUpdate:
+		cmd = cp.Update
+	}
+	if cmd.Command == "" {
+		if op == OpInstall {
+			return fmt.Errorf("missing install script for custom package: %s", cp.Name)
+		}
 		return nil
 	}
+
 	latest := ""
 	installed := ""
 	if cp.GetLatestVersion.Command != "" {
@@ -127,22 +131,34 @@ func (m *Manager) updateCustomWithRunner(cp config.CustomPackage, runner Runner)
 		installed = strings.TrimSpace(res.Stdout)
 	}
 
-	if installed == "" {
+	need := false
+	switch op {
+	case OpInstall:
+		need = installed == ""
+	case OpUpdate:
+		if installed == "" {
+			return nil
+		}
+		if latest != "" {
+			need = cmpVersion(latest, installed) > 0
+		}
+	}
+
+	if !need {
 		return nil
 	}
 
-	need := false
-	if latest != "" {
-		need = cmpVersion(latest, installed) > 0
-	}
-
-	if need {
-		updCmd := config.Command{Command: fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cp.Update.Command), RequireRoot: cp.Update.RequireRoot}
-		if err := runner.Run(cp.Name, "update", updCmd); err != nil {
+	if op == OpInstall && cp.Remove.Command != "" {
+		if err := runner.Run(cp.Name, "remove-before-install", cp.Remove); err != nil {
 			return err
 		}
 	}
-	return nil
+
+	execCmd := config.Command{
+		Command:     fmt.Sprintf("latest_version=%q installed_version=%q; %s", latest, installed, cmd.Command),
+		RequireRoot: cmd.RequireRoot,
+	}
+	return runner.Run(cp.Name, string(op), execCmd)
 }
 
 func (m *Manager) GetVersionInstalled(k PackageKey) string {
@@ -153,45 +169,79 @@ func (m *Manager) GetVersionAvailable(k PackageKey) string {
 	return m.getVersionAvailable(k)
 }
 
+func (m *Manager) HasCommand(k PackageKey, op Operation) bool {
+	if k.Kind == "custom" {
+		cp := m.customByName(k.Name)
+		switch op {
+		case OpInstall:
+			return cp.Install.Command != ""
+		case OpUpdate:
+			return cp.Update.Command != ""
+		}
+		return false
+	}
+	src := m.sourceByName(k.Source)
+	if src.Name == "" {
+		return false
+	}
+	switch op {
+	case OpInstall:
+		return src.Install.Command != ""
+	case OpUpdate:
+		return src.Update.Command != ""
+	}
+	return false
+}
+
 func (m *Manager) Tracked() map[string][]string {
 	return groupTracked(m.cfg)
 }
 
-func (m *Manager) UpdateSelected(keys []PackageKey, runner Runner, onUpdate func(PackageKey, bool, string)) error {
-	bySrcUpdate := map[string][]string{}
+func (m *Manager) ExecuteSelected(keys []PackageKey, op Operation, runner Runner, onDone func(PackageKey, bool, string)) error {
+	bySrc := map[string][]string{}
 	customSet := map[string]struct{}{}
 	for _, k := range keys {
 		if k.Kind == "custom" {
 			customSet[k.Name] = struct{}{}
 			continue
 		}
-		bySrcUpdate[k.Source] = append(bySrcUpdate[k.Source], k.Name)
+		bySrc[k.Source] = append(bySrc[k.Source], k.Name)
 	}
 
 	var wg sync.WaitGroup
-	for src, names := range bySrcUpdate {
+	for src, names := range bySrc {
 		src, names := src, append([]string{}, names...)
 		s := m.sourceByName(src)
 		if len(names) == 0 || s.Name == "" {
 			continue
 		}
-		if s.Update.Command == "" {
+		var srcCmd config.Command
+		switch op {
+		case OpInstall:
+			srcCmd = s.Install
+		case OpUpdate:
+			srcCmd = s.Update
+		}
+		if srcCmd.Command == "" {
 			continue
 		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			cmdStr := strings.ReplaceAll(s.Update.Command, "{package_list}", strings.Join(names, " "))
-			cmd := config.Command{Command: cmdStr, RequireRoot: s.Update.RequireRoot}
-			err := runner.Run(src, "update-group", cmd)
+			cmdStr := strings.ReplaceAll(srcCmd.Command, "{package_list}", strings.Join(names, " "))
+			cmd := config.Command{Command: cmdStr, RequireRoot: srcCmd.RequireRoot}
+			err := runner.Run(src, string(op)+"-group", cmd)
 			for _, n := range names {
 				ok := err == nil
 				msg := "updated"
+				if op == OpInstall {
+					msg = "installed"
+				}
 				if err != nil {
 					msg = err.Error()
 				}
-				if onUpdate != nil {
-					onUpdate(PackageKey{Source: src, Name: n, Kind: kindOf(src)}, ok, msg)
+				if onDone != nil {
+					onDone(PackageKey{Source: src, Name: n, Kind: KindOf(src)}, ok, msg)
 				}
 			}
 		}()
@@ -201,17 +251,29 @@ func (m *Manager) UpdateSelected(keys []PackageKey, runner Runner, onUpdate func
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := m.updateCustomWithRunner(m.customByName(name), runner); err != nil {
-				if onUpdate != nil {
-					onUpdate(PackageKey{Source: "custom", Name: name, Kind: "custom"}, false, err.Error())
+			msg := "updated"
+			if op == OpInstall {
+				msg = "installed"
+			}
+			if err := m.executeCustomWithRunner(m.customByName(name), op, runner); err != nil {
+				if onDone != nil {
+					onDone(PackageKey{Source: "custom", Name: name, Kind: "custom"}, false, err.Error())
 				}
 			} else {
-				if onUpdate != nil {
-					onUpdate(PackageKey{Source: "custom", Name: name, Kind: "custom"}, true, "")
+				if onDone != nil {
+					onDone(PackageKey{Source: "custom", Name: name, Kind: "custom"}, true, msg)
 				}
 			}
 		}()
 	}
 	wg.Wait()
 	return nil
+}
+
+func (m *Manager) UpdateSelected(keys []PackageKey, runner Runner, onUpdate func(PackageKey, bool, string)) error {
+	return m.ExecuteSelected(keys, OpUpdate, runner, onUpdate)
+}
+
+func (m *Manager) InstallSelected(keys []PackageKey, runner Runner, onInstall func(PackageKey, bool, string)) error {
+	return m.ExecuteSelected(keys, OpInstall, runner, onInstall)
 }

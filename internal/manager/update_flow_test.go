@@ -31,10 +31,10 @@ func TestGroupTracked(t *testing.T) {
 }
 
 func TestKindOf(t *testing.T) {
-	if kindOf("custom") != "custom" {
-		t.Fatalf("kindOf custom")
+	if KindOf("custom") != "custom" {
+		t.Fatalf("KindOf custom")
 	}
-	if kindOf("apt") != "source" {
-		t.Fatalf("kindOf source")
+	if KindOf("apt") != "source" {
+		t.Fatalf("KindOf source")
 	}
 }

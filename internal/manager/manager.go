@@ -14,18 +14,22 @@ import (
 	"github.com/gopak/gopak-cli/internal/logging"
 )
 
-type Manager struct{ cfg config.Config }
-
-var preUpdateOnce sync.Map
+type Manager struct {
+	cfg           config.Config
+	customByIdx   map[string]int
+	pkgByIdx      map[string]int
+	sourceByIdx   map[string]int
+	preUpdateOnce sync.Map
+}
 
 func hashScript(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
 }
 
-func resetPreUpdateCache() {
-	preUpdateOnce.Range(func(k, _ any) bool {
-		preUpdateOnce.Delete(k)
+func (m *Manager) resetPreUpdateCache() {
+	m.preUpdateOnce.Range(func(k, _ any) bool {
+		m.preUpdateOnce.Delete(k)
 		return true
 	})
 }
@@ -35,7 +39,7 @@ func (m *Manager) ensurePreUpdate(src config.Source) {
 		return
 	}
 	h := hashScript(src.PreUpdate.Command)
-	if _, loaded := preUpdateOnce.LoadOrStore(h, struct{}{}); loaded {
+	if _, loaded := m.preUpdateOnce.LoadOrStore(h, struct{}{}); loaded {
 		return
 	}
 	logging.Debug(fmt.Sprintf("%s [pre_update]: %s", src.Name, src.PreUpdate.Command))
@@ -115,7 +119,24 @@ func splitNumeric(s string) []int {
 	return out
 }
 
-func New(cfg config.Config) *Manager { return &Manager{cfg: cfg} }
+func New(cfg config.Config) *Manager {
+	m := &Manager{
+		cfg:         cfg,
+		customByIdx: make(map[string]int, len(cfg.CustomPackages)),
+		pkgByIdx:    make(map[string]int, len(cfg.Packages)),
+		sourceByIdx: make(map[string]int, len(cfg.Sources)),
+	}
+	for i, cp := range cfg.CustomPackages {
+		m.customByIdx[cp.Name] = i
+	}
+	for i, p := range cfg.Packages {
+		m.pkgByIdx[p.Name] = i
+	}
+	for i, s := range cfg.Sources {
+		m.sourceByIdx[s.Name] = i
+	}
+	return m
+}
 
 func (m *Manager) Install(name string) error {
 	plan, err := m.resolve(name)
@@ -305,37 +326,27 @@ func (m *Manager) resolve(name string) ([]string, error) {
 }
 
 func (m *Manager) isCustom(name string) bool {
-	for _, cp := range m.cfg.CustomPackages {
-		if cp.Name == name {
-			return true
-		}
-	}
-	return false
+	_, ok := m.customByIdx[name]
+	return ok
 }
 
 func (m *Manager) customByName(name string) config.CustomPackage {
-	for _, cp := range m.cfg.CustomPackages {
-		if cp.Name == name {
-			return cp
-		}
+	if i, ok := m.customByIdx[name]; ok {
+		return m.cfg.CustomPackages[i]
 	}
 	return config.CustomPackage{}
 }
 
 func (m *Manager) pkgByName(name string) config.Package {
-	for _, p := range m.cfg.Packages {
-		if p.Name == name {
-			return p
-		}
+	if i, ok := m.pkgByIdx[name]; ok {
+		return m.cfg.Packages[i]
 	}
 	return config.Package{}
 }
 
 func (m *Manager) sourceByName(name string) config.Source {
-	for _, s := range m.cfg.Sources {
-		if s.Name == name {
-			return s
-		}
+	if i, ok := m.sourceByIdx[name]; ok {
+		return m.cfg.Sources[i]
 	}
 	return config.Source{}
 }

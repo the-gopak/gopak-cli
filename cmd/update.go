@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"github.com/gopak/gopak-cli/internal/config"
 	"github.com/gopak/gopak-cli/internal/manager"
 	"github.com/gopak/gopak-cli/internal/ui/console"
+	"github.com/spf13/cobra"
 )
 
 func init() {

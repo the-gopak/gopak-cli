@@ -12,20 +12,48 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 )
 
-// updateEvent captures a single package update outcome.
-// Business: used for the update log to inform the user which items changed or failed.
-type updateEvent struct {
+type packageEvent struct {
 	k   manager.PackageKey
 	ok  bool
 	msg string
 }
 
-func (c *ConsoleUI) Update() error {
+type filterFunc func(status manager.VersionStatus) bool
+
+type labelFunc func(k manager.PackageKey, status manager.VersionStatus) string
+
+func filterForUpdate(s manager.VersionStatus) bool {
+	return s.Installed != "" && s.Available != "" && s.Installed != s.Available
+}
+
+func filterForInstall(s manager.VersionStatus) bool {
+	return s.Installed == ""
+}
+
+func labelForUpdate(k manager.PackageKey, s manager.VersionStatus) string {
+	return fmt.Sprintf("%s/%s %s -> %s", k.Source, k.Name, s.Installed, s.Available)
+}
+
+func labelForInstall(k manager.PackageKey, s manager.VersionStatus) string {
+	if s.Available != "" {
+		return fmt.Sprintf("%s/%s %s", k.Source, k.Name, s.Available)
+	}
+	return fmt.Sprintf("%s/%s", k.Source, k.Name)
+}
+
+func (c *ConsoleUI) packageSelectionFlow(
+	op manager.Operation,
+	filter filterFunc,
+	labelFn labelFunc,
+	emptyMsg string,
+	selectMsg string,
+	confirmMsg string,
+) error {
 	groups := c.m.Tracked()
 	status := map[manager.PackageKey]manager.VersionStatus{}
 	lastLines := 0
-	repaint := func(hideUpToDate bool) {
-		out := renderGroups(groups, status, hideUpToDate)
+	repaint := func(hideCompleted bool) {
+		out := renderGroups(groups, status, hideCompleted)
 		if lastLines > 0 {
 			fmt.Printf("\x1b[%dA", lastLines)
 			fmt.Print("\x1b[J")
@@ -40,11 +68,13 @@ func (c *ConsoleUI) Update() error {
 	var mu sync.Mutex
 	for grp, names := range groups {
 		for _, n := range names {
-			k := manager.PackageKey{Source: grp, Name: n, Kind: kindOf(grp)}
+			k := manager.PackageKey{Source: grp, Name: n, Kind: manager.KindOf(grp)}
+			if !c.m.HasCommand(k, op) {
+				continue
+			}
 			wg.Add(1)
 			go func(k manager.PackageKey) {
 				defer wg.Done()
-				// Installed version
 				ins := c.m.GetVersionInstalled(k)
 				mu.Lock()
 				s := status[k]
@@ -53,7 +83,6 @@ func (c *ConsoleUI) Update() error {
 				mu.Unlock()
 				updates <- struct{}{}
 
-				// Available version
 				av := c.m.GetVersionAvailable(k)
 				mu.Lock()
 				s = status[k]
@@ -72,37 +101,35 @@ func (c *ConsoleUI) Update() error {
 	keysAll := make([]manager.PackageKey, 0)
 	for grp, names := range groups {
 		for _, n := range names {
-			keysAll = append(keysAll, manager.PackageKey{Source: grp, Name: n, Kind: kindOf(grp)})
+			k := manager.PackageKey{Source: grp, Name: n, Kind: manager.KindOf(grp)}
+			if c.m.HasCommand(k, op) {
+				keysAll = append(keysAll, k)
+			}
 		}
 	}
 	need := make([]manager.PackageKey, 0)
 	for _, k := range keysAll {
-		s := status[k]
-		if s.Installed == "" {
-			continue
-		}
-		if s.Available != "" && s.Installed != s.Available {
+		if filter(status[k]) {
 			need = append(need, k)
 		}
 	}
 	repaint(len(need) > 0)
 
 	if len(need) == 0 {
-		fmt.Println("Nothing to update")
+		fmt.Println(emptyMsg)
 		return nil
 	}
 
 	labels := make([]string, 0, len(need))
 	labelByKey := map[string]manager.PackageKey{}
 	for _, k := range need {
-		s := status[k]
-		lbl := fmt.Sprintf("%s/%s %s -> %s", k.Source, k.Name, s.Installed, s.Available)
+		lbl := labelFn(k, status[k])
 		labels = append(labels, lbl)
 		labelByKey[lbl] = k
 	}
 
 	selectedLabels := make([]string, 0)
-	ms := &survey.MultiSelect{Message: "Select packages to update", Options: labels, Default: labels}
+	ms := &survey.MultiSelect{Message: selectMsg, Options: labels, Default: labels}
 	if err := survey.AskOne(ms, &selectedLabels); err != nil {
 		return err
 	}
@@ -117,7 +144,7 @@ func (c *ConsoleUI) Update() error {
 	fmt.Printf("%v\n", keysSelected)
 
 	ok := false
-	if err := survey.AskOne(&survey.Confirm{Message: "Proceed to update selected?", Default: true}, &ok); err != nil {
+	if err := survey.AskOne(&survey.Confirm{Message: confirmMsg, Default: true}, &ok); err != nil {
 		return err
 	}
 	if !ok {
@@ -127,22 +154,25 @@ func (c *ConsoleUI) Update() error {
 	runner := manager.NewSudoRunner()
 	defer runner.Close()
 
-	var wgU sync.WaitGroup
-	evCh := make(chan updateEvent, 16)
-	wgU.Add(1)
+	var wgE sync.WaitGroup
+	evCh := make(chan packageEvent, 16)
+	wgE.Add(1)
 	go func() {
-		defer wgU.Done()
-		_ = c.m.UpdateSelected(keysSelected, runner, func(k manager.PackageKey, ok bool, msg string) {
-			evCh <- updateEvent{k: k, ok: ok, msg: msg}
+		defer wgE.Done()
+		_ = c.m.ExecuteSelected(keysSelected, op, runner, func(k manager.PackageKey, ok bool, msg string) {
+			evCh <- packageEvent{k: k, ok: ok, msg: msg}
 		})
 	}()
-	go func() { wgU.Wait(); close(evCh) }()
+	go func() { wgE.Wait(); close(evCh) }()
 
 	for e := range evCh {
 		if e.ok {
 			action := e.msg
 			if action == "" {
 				action = "updated"
+				if op == manager.OpInstall {
+					action = "installed"
+				}
 			}
 			fmt.Println(colorGreen(action + ": " + e.k.Name))
 		} else {
@@ -153,6 +183,28 @@ func (c *ConsoleUI) Update() error {
 		}
 	}
 	return nil
+}
+
+func (c *ConsoleUI) Update() error {
+	return c.packageSelectionFlow(
+		manager.OpUpdate,
+		filterForUpdate,
+		labelForUpdate,
+		"Nothing to update",
+		"Select packages to update",
+		"Proceed to update selected?",
+	)
+}
+
+func (c *ConsoleUI) Install() error {
+	return c.packageSelectionFlow(
+		manager.OpInstall,
+		filterForInstall,
+		labelForInstall,
+		"Nothing to install",
+		"Select packages to install",
+		"Proceed to install selected?",
+	)
 }
 
 func renderGroups(groups map[string][]string, status map[manager.PackageKey]manager.VersionStatus, hideUpToDate bool) string {
@@ -177,7 +229,7 @@ func renderGroups(groups map[string][]string, status map[manager.PackageKey]mana
 		names := append([]string{}, groups[grp]...)
 		sort.Strings(names)
 		for _, name := range names {
-			k := manager.PackageKey{Source: grp, Name: name, Kind: kindOf(grp)}
+			k := manager.PackageKey{Source: grp, Name: name, Kind: manager.KindOf(grp)}
 			s := status[k]
 			cur := ""
 			ins := ""
