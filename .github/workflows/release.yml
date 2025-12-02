@@ -111,47 +111,31 @@ jobs:
           path: ${{ steps.build.outputs.binary }}
           if-no-files-found: error
 
-      - name: Generate Linux checksums
-        if: startsWith(github.ref, 'refs/tags/') && matrix.goos == 'linux'
-        run: (cd dist && sha256sum *.tar.gz) > dist/checksums.txt
+  release:
+    name: Create GitHub Release
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
 
-      - name: Generate Windows checksums
-        if: startsWith(github.ref, 'refs/tags/') && matrix.goos == 'windows'
-        run: (cd dist && sha256sum *.zip *.exe) > dist/checksums.txt
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name 'gopak*' \) -exec cp {} release/ \;
+          ls -la release/
 
-      - name: Generate macOS checksums
-        if: startsWith(github.ref, 'refs/tags/') && matrix.goos == 'darwin'
-        run: (cd dist && sha256sum *.zip) > dist/checksums.txt
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum * > checksums.txt
+          cat checksums.txt
 
-      - name: Upload Linux release assets
-        if: startsWith(github.ref, 'refs/tags/') && matrix.goos == 'linux'
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/*.tar.gz
-            dist/checksums.txt
+          files: release/*
           fail_on_unmatched_files: true
-          overwrite_files: true
-
-      - name: Upload Windows release assets
-        if: startsWith(github.ref, 'refs/tags/') && matrix.goos == 'windows'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*.zip
-            dist/*.exe
-            dist/checksums.txt
-          fail_on_unmatched_files: true
-          overwrite_files: true
-
-      - name: Upload macOS release assets
-        if: startsWith(github.ref, 'refs/tags/') && matrix.goos == 'darwin'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*.zip
-            dist/checksums.txt
-          fail_on_unmatched_files: true
-          overwrite_files: true
-
-          
