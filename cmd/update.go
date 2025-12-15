@@ -24,6 +24,7 @@ func updateNeeded(installed, available string) bool {
 
 func init() {
 	var dryRun bool
+	var yes bool
 	cmd := &cobra.Command{
 		Use:   "update [name]",
 		Short: "Update one package or all",
@@ -88,11 +89,54 @@ func init() {
 			if len(args) == 1 {
 				return m.UpdateOne(args[0])
 			}
+			if yes {
+				groups := m.Tracked()
+				keys := make([]manager.PackageKey, 0)
+				for grp, names := range groups {
+					for _, n := range names {
+						k := manager.PackageKey{Source: grp, Name: n, Kind: manager.KindOf(grp)}
+						if !m.HasCommand(k, manager.OpUpdate) {
+							continue
+						}
+						ins := m.GetVersionInstalled(k)
+						if ins == "" {
+							continue
+						}
+						av := m.GetVersionAvailable(k)
+						if updateNeeded(ins, av) {
+							keys = append(keys, k)
+						}
+					}
+				}
+				sort.Slice(keys, func(i, j int) bool {
+					if keys[i].Source == keys[j].Source {
+						return keys[i].Name < keys[j].Name
+					}
+					return keys[i].Source < keys[j].Source
+				})
+				if len(keys) == 0 {
+					fmt.Println("Nothing to update")
+					return nil
+				}
+				runner := manager.NewSudoRunner()
+				defer runner.Close()
+				return m.UpdateSelected(keys, runner, func(k manager.PackageKey, ok bool, msg string) {
+					if ok {
+						fmt.Println("updated: " + k.Name)
+						return
+					}
+					fmt.Println("failed:  " + k.Name)
+					if msg != "" {
+						fmt.Println(msg)
+					}
+				})
+			}
 			ui := console.NewConsoleUI(m)
 
 			return ui.Update()
 		},
 	}
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print planned changes without executing")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "assume yes and update all without prompting")
 	rootCmd.AddCommand(cmd)
 }

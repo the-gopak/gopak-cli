@@ -12,6 +12,7 @@ import (
 
 func init() {
 	var dryRun bool
+	var yes bool
 	cmd := &cobra.Command{
 		Use:   "install [name]",
 		Short: "Install one package or select from uninstalled",
@@ -77,11 +78,50 @@ func init() {
 			if len(args) == 1 {
 				return m.Install(args[0])
 			}
+			if yes {
+				groups := m.Tracked()
+				keys := make([]manager.PackageKey, 0)
+				for grp, names := range groups {
+					for _, n := range names {
+						k := manager.PackageKey{Source: grp, Name: n, Kind: manager.KindOf(grp)}
+						if !m.HasCommand(k, manager.OpInstall) {
+							continue
+						}
+						if m.GetVersionInstalled(k) != "" {
+							continue
+						}
+						keys = append(keys, k)
+					}
+				}
+				sort.Slice(keys, func(i, j int) bool {
+					if keys[i].Source == keys[j].Source {
+						return keys[i].Name < keys[j].Name
+					}
+					return keys[i].Source < keys[j].Source
+				})
+				if len(keys) == 0 {
+					fmt.Println("Nothing to install")
+					return nil
+				}
+				runner := manager.NewSudoRunner()
+				defer runner.Close()
+				return m.InstallSelected(keys, runner, func(k manager.PackageKey, ok bool, msg string) {
+					if ok {
+						fmt.Println("installed: " + k.Name)
+						return
+					}
+					fmt.Println("failed:  " + k.Name)
+					if msg != "" {
+						fmt.Println(msg)
+					}
+				})
+			}
 			ui := console.NewConsoleUI(m)
 
 			return ui.Install()
 		},
 	}
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print planned changes without executing")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "assume yes and install all without prompting")
 	rootCmd.AddCommand(cmd)
 }
