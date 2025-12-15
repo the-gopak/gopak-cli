@@ -16,9 +16,12 @@ func TestResolveOrder(t *testing.T) {
 		CustomPackages: []config.CustomPackage{
 			{Name: "mytool", DependsOn: []string{"neovim"}, Install: config.Command{Command: "echo install mytool"}},
 		},
+		GithubReleasePackages: []config.GithubReleasePackage{
+			{Name: "syncthing", Repo: "syncthing/syncthing", AssetPattern: "*linux-amd64*", DependsOn: []string{"mytool"}},
+		},
 	}
 	m := New(cfg)
-	order, err := m.resolve("mytool")
+	order, err := m.resolve("syncthing")
 	if err != nil {
 		t.Fatalf("resolve error: %v", err)
 	}
@@ -26,14 +29,39 @@ func TestResolveOrder(t *testing.T) {
 	for i, n := range order {
 		pos[n] = i
 	}
-	if !(pos["git"] < pos["neovim"] && pos["neovim"] < pos["mytool"]) {
+	if !(pos["git"] < pos["neovim"] && pos["neovim"] < pos["mytool"] && pos["mytool"] < pos["syncthing"]) {
 		t.Fatalf("bad order: %v", order)
 	}
 	for i, n := range order {
 		pos[n] = i
 	}
-	if !(pos["git"] < pos["neovim"] && pos["neovim"] < pos["mytool"]) {
+	if !(pos["git"] < pos["neovim"] && pos["neovim"] < pos["mytool"] && pos["mytool"] < pos["syncthing"]) {
 		t.Fatalf("bad order: %v", order)
+	}
+}
+
+func TestHasCommand_GithubRelease(t *testing.T) {
+	cfg := config.Config{
+		GithubReleasePackages: []config.GithubReleasePackage{{
+			Name:         "syncthing",
+			Repo:         "syncthing/syncthing",
+			AssetPattern: "syncthing-linux-amd64-*.tar.gz",
+			PostInstall:  config.Command{Command: "echo install"},
+		}},
+	}
+	m := New(cfg)
+	key := PackageKey{Source: "github", Name: "syncthing", Kind: "github"}
+	if !m.HasCommand(key, OpInstall) {
+		t.Fatalf("expected HasCommand to be true for github install")
+	}
+	if !m.HasCommand(key, OpUpdate) {
+		t.Fatalf("expected HasCommand to be true for github update")
+	}
+}
+
+func TestCompareVersions_VPrefixEqual(t *testing.T) {
+	if CompareVersions("v2.0.12", "2.0.12") != 0 {
+		t.Fatalf("expected versions to be equal")
 	}
 }
 

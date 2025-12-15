@@ -34,10 +34,21 @@ type CustomPackage struct {
 	Remove              Command  `mapstructure:"remove" yaml:"remove" json:"remove"`
 }
 
+type GithubReleasePackage struct {
+	Name                string  `mapstructure:"name" yaml:"name" json:"name"`
+	Repo                string  `mapstructure:"repo" yaml:"repo" json:"repo"`
+	AssetPattern        string  `mapstructure:"asset_pattern" yaml:"asset_pattern" json:"asset_pattern"`
+	GetInstalledVersion Command `mapstructure:"get_installed_version" yaml:"get_installed_version" json:"get_installed_version"`
+	PostInstall         Command `mapstructure:"post_install" yaml:"post_install" json:"post_install"`
+	Remove              Command `mapstructure:"remove" yaml:"remove" json:"remove"`
+	DependsOn           []string `mapstructure:"depends_on" yaml:"depends_on" json:"depends_on,omitempty"`
+}
+
 type Config struct {
-	Sources        []Source        `mapstructure:"sources" yaml:"sources" json:"sources,omitempty"`
-	Packages       []Package       `mapstructure:"packages" yaml:"packages" json:"packages,omitempty"`
-	CustomPackages []CustomPackage `mapstructure:"custom_packages" yaml:"custom_packages" json:"custom_packages,omitempty"`
+	Sources               []Source              `mapstructure:"sources" yaml:"sources" json:"sources,omitempty"`
+	Packages              []Package             `mapstructure:"packages" yaml:"packages" json:"packages,omitempty"`
+	CustomPackages        []CustomPackage       `mapstructure:"custom_packages" yaml:"custom_packages" json:"custom_packages,omitempty"`
+	GithubReleasePackages []GithubReleasePackage `mapstructure:"github_release_packages" yaml:"github_release_packages" json:"github_release_packages,omitempty"`
 }
 
 type Command struct {

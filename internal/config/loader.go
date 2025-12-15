@@ -31,6 +31,7 @@ func LoadFromFiles(files []string) (Config, error) {
 		combined.Sources = append(combined.Sources, part.Sources...)
 		combined.Packages = append(combined.Packages, part.Packages...)
 		combined.CustomPackages = append(combined.CustomPackages, part.CustomPackages...)
+		combined.GithubReleasePackages = append(combined.GithubReleasePackages, part.GithubReleasePackages...)
 	}
 	if err := ValidateNoDuplicates(combined); err != nil {
 		return Config{}, err
@@ -52,6 +53,9 @@ func LoadDefaultsAndFiles(defaultsYAML []byte, files []string) (Config, error) {
 		seen[p.Name] = "defaults"
 	}
 	for _, p := range base.CustomPackages {
+		seen[p.Name] = "defaults"
+	}
+	for _, p := range base.GithubReleasePackages {
 		seen[p.Name] = "defaults"
 	}
 	for _, f := range sortedYAML(files) {
@@ -91,6 +95,12 @@ func ValidateNoDuplicates(cfg Config) error {
 		p[v.Name] = struct{}{}
 	}
 	for _, v := range cfg.CustomPackages {
+		if _, ok := p[v.Name]; ok {
+			return fmt.Errorf("duplicate package name: %s", v.Name)
+		}
+		p[v.Name] = struct{}{}
+	}
+	for _, v := range cfg.GithubReleasePackages {
 		if _, ok := p[v.Name]; ok {
 			return fmt.Errorf("duplicate package name: %s", v.Name)
 		}
@@ -137,7 +147,11 @@ func mergeConfig(base, overlay Config) Config {
 	custom = append(custom, base.CustomPackages...)
 	custom = append(custom, overlay.CustomPackages...)
 
-	return Config{Sources: sources, Packages: packages, CustomPackages: custom}
+	gh := make([]GithubReleasePackage, 0, len(base.GithubReleasePackages)+len(overlay.GithubReleasePackages))
+	gh = append(gh, base.GithubReleasePackages...)
+	gh = append(gh, overlay.GithubReleasePackages...)
+
+	return Config{Sources: sources, Packages: packages, CustomPackages: custom, GithubReleasePackages: gh}
 }
 
 func mergeSource(a, b Source) Source {
@@ -190,12 +204,23 @@ func checkPkgDuplicatesWithFiles(seen map[string]string, part Config, file strin
 		}
 		local[p.Name] = struct{}{}
 	}
+	for _, p := range part.GithubReleasePackages {
+		if _, ok := local[p.Name]; ok {
+			return fmt.Errorf("duplicate package '%s' found in %s", p.Name, file)
+		}
+		local[p.Name] = struct{}{}
+	}
 	for _, p := range part.Packages {
 		if prev, ok := seen[p.Name]; ok {
 			return fmt.Errorf("duplicate package '%s' found in %s and %s", p.Name, prev, file)
 		}
 	}
 	for _, p := range part.CustomPackages {
+		if prev, ok := seen[p.Name]; ok {
+			return fmt.Errorf("duplicate package '%s' found in %s and %s", p.Name, prev, file)
+		}
+	}
+	for _, p := range part.GithubReleasePackages {
 		if prev, ok := seen[p.Name]; ok {
 			return fmt.Errorf("duplicate package '%s' found in %s and %s", p.Name, prev, file)
 		}
@@ -204,6 +229,9 @@ func checkPkgDuplicatesWithFiles(seen map[string]string, part Config, file strin
 		seen[p.Name] = file
 	}
 	for _, p := range part.CustomPackages {
+		seen[p.Name] = file
+	}
+	for _, p := range part.GithubReleasePackages {
 		seen[p.Name] = file
 	}
 	return nil

@@ -5,18 +5,29 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/gopak/gopak-cli/internal/config"
 	"github.com/gopak/gopak-cli/internal/executil"
+	ghapi "github.com/gopak/gopak-cli/internal/github"
 	"github.com/gopak/gopak-cli/internal/logging"
 )
 
+type githubClient interface {
+	GetLatestRelease(repo string) (*ghapi.Release, error)
+	FindAsset(release *ghapi.Release, pattern string) (*ghapi.Asset, error)
+	DownloadAsset(asset *ghapi.Asset, destDir string) (string, error)
+}
+
 type Manager struct {
 	cfg           config.Config
+	ghClient      githubClient
 	customByIdx   map[string]int
+	ghByIdx       map[string]int
 	pkgByIdx      map[string]int
 	sourceByIdx   map[string]int
 	preUpdateOnce sync.Map
@@ -47,6 +58,14 @@ func (m *Manager) ensurePreUpdate(src config.Source) {
 	if res.Code != 0 {
 		logging.Debug(fmt.Sprintf("%s [pre_update failed]: exit=%d", src.Name, res.Code))
 	}
+}
+
+func CompareVersions(a, b string) int {
+	return cmpVersion(a, b)
+}
+
+func NormalizeVersion(s string) string {
+	return normalizeVersion(s)
 }
 
 func cmpVersion(a, b string) int {
@@ -122,12 +141,17 @@ func splitNumeric(s string) []int {
 func New(cfg config.Config) *Manager {
 	m := &Manager{
 		cfg:         cfg,
+		ghClient:    ghapi.NewClient(),
 		customByIdx: make(map[string]int, len(cfg.CustomPackages)),
+		ghByIdx:     make(map[string]int, len(cfg.GithubReleasePackages)),
 		pkgByIdx:    make(map[string]int, len(cfg.Packages)),
 		sourceByIdx: make(map[string]int, len(cfg.Sources)),
 	}
 	for i, cp := range cfg.CustomPackages {
 		m.customByIdx[cp.Name] = i
+	}
+	for i, gp := range cfg.GithubReleasePackages {
+		m.ghByIdx[gp.Name] = i
 	}
 	for i, p := range cfg.Packages {
 		m.pkgByIdx[p.Name] = i
@@ -159,6 +183,12 @@ func (m *Manager) Install(name string) error {
 				return err
 			}
 			logging.Success("installed: " + n)
+		} else if m.isGithubRelease(n) {
+			gp := m.githubByName(n)
+			if err := m.installGithubRelease(gp); err != nil {
+				return err
+			}
+			logging.Success("installed: " + n)
 		} else {
 			p := m.pkgByName(n)
 			s := m.sourceByName(p.Source)
@@ -180,6 +210,13 @@ func (m *Manager) Remove(name string) error {
 		}
 		return m.runCtx(name, "remove", cp.Remove)
 	}
+	if m.isGithubRelease(name) {
+		gp := m.githubByName(name)
+		if gp.Remove.Command == "" {
+			return fmt.Errorf("missing remove script for github release package: %s", name)
+		}
+		return m.runCtx(name, "remove", gp.Remove)
+	}
 	p := m.pkgByName(name)
 	s := m.sourceByName(p.Source)
 	cmd := strings.ReplaceAll(s.Remove.Command, "{package_list}", name)
@@ -190,6 +227,9 @@ func (m *Manager) UpdateOne(name string) error {
 	logging.Debug("update one: " + name)
 	if m.isCustom(name) {
 		return m.updateCustom(m.customByName(name))
+	}
+	if m.isGithubRelease(name) {
+		return m.updateGithubRelease(m.githubByName(name))
 	}
 	p := m.pkgByName(name)
 	s := m.sourceByName(p.Source)
@@ -218,6 +258,17 @@ func (m *Manager) List() error {
 			v = "not installed"
 		}
 		logging.Info("custom: " + cp.Name + " (" + v + ")")
+	}
+	for _, gp := range m.cfg.GithubReleasePackages {
+		v := ""
+		if gp.GetInstalledVersion.Command != "" {
+			res := executil.RunShell(gp.GetInstalledVersion)
+			v = strings.TrimSpace(res.Stdout)
+		}
+		if v == "" {
+			v = "not installed"
+		}
+		logging.Info("github: " + gp.Name + " (" + v + ")")
 	}
 	return nil
 }
@@ -297,6 +348,9 @@ func (m *Manager) resolve(name string) ([]string, error) {
 	for _, c := range m.cfg.CustomPackages {
 		nodes[c.Name] = append([]string{}, c.DependsOn...)
 	}
+	for _, g := range m.cfg.GithubReleasePackages {
+		nodes[g.Name] = append([]string{}, g.DependsOn...)
+	}
 	if _, ok := nodes[name]; !ok {
 		return nil, errors.New("unknown package: " + name)
 	}
@@ -337,6 +391,18 @@ func (m *Manager) customByName(name string) config.CustomPackage {
 	return config.CustomPackage{}
 }
 
+func (m *Manager) isGithubRelease(name string) bool {
+	_, ok := m.ghByIdx[name]
+	return ok
+}
+
+func (m *Manager) githubByName(name string) config.GithubReleasePackage {
+	if i, ok := m.ghByIdx[name]; ok {
+		return m.cfg.GithubReleasePackages[i]
+	}
+	return config.GithubReleasePackage{}
+}
+
 func (m *Manager) pkgByName(name string) config.Package {
 	if i, ok := m.pkgByIdx[name]; ok {
 		return m.cfg.Packages[i]
@@ -364,4 +430,68 @@ func (m *Manager) runCtx(name string, step string, command config.Command) error
 		return fmt.Errorf("command failed for %s [%s]: exit %d", name, step, res.Code)
 	}
 	return nil
+}
+
+func (m *Manager) installGithubRelease(gp config.GithubReleasePackage) error {
+	installed := ""
+	if gp.GetInstalledVersion.Command != "" {
+		res := executil.RunShell(gp.GetInstalledVersion)
+		if res.Code == 0 {
+			installed = strings.TrimSpace(res.Stdout)
+		}
+	}
+	if installed != "" {
+		return nil
+	}
+	if gp.PostInstall.Command == "" {
+		return fmt.Errorf("missing post_install for github release package: %s", gp.Name)
+	}
+	return m.installOrUpdateGithubRelease(gp, "")
+}
+
+func (m *Manager) updateGithubRelease(gp config.GithubReleasePackage) error {
+	installed := ""
+	if gp.GetInstalledVersion.Command != "" {
+		res := executil.RunShell(gp.GetInstalledVersion)
+		if res.Code == 0 {
+			installed = strings.TrimSpace(res.Stdout)
+		}
+	}
+	if installed == "" {
+		return nil
+	}
+	if gp.PostInstall.Command == "" {
+		return nil
+	}
+	return m.installOrUpdateGithubRelease(gp, installed)
+}
+
+func (m *Manager) installOrUpdateGithubRelease(gp config.GithubReleasePackage, installed string) error {
+	rel, err := m.ghClient.GetLatestRelease(gp.Repo)
+	if err != nil {
+		return err
+	}
+	latest := strings.TrimSpace(rel.TagName)
+	if installed != "" && latest != "" && cmpVersion(latest, installed) <= 0 {
+		return nil
+	}
+	asset, err := m.ghClient.FindAsset(rel, gp.AssetPattern)
+	if err != nil {
+		return err
+	}
+	tmpDir, err := os.MkdirTemp("", "gopak-"+gp.Name+"-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpDir)
+	path, err := m.ghClient.DownloadAsset(asset, tmpDir)
+	if err != nil {
+		return err
+	}
+	path = filepath.Clean(path)
+	cmd := config.Command{
+		Command:     fmt.Sprintf("latest_version=%q installed_version=%q asset_path=%q; %s", latest, installed, path, gp.PostInstall.Command),
+		RequireRoot: gp.PostInstall.RequireRoot,
+	}
+	return m.runCtx(gp.Name, "post_install", cmd)
 }

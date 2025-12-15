@@ -2,6 +2,7 @@ package manager
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -21,6 +22,9 @@ func KindOf(group string) string {
 	if group == "custom" {
 		return "custom"
 	}
+	if group == "github" {
+		return "github"
+	}
 	return "source"
 }
 
@@ -33,6 +37,12 @@ func groupTracked(cfg config.Config) map[string][]string {
 	if len(cfg.CustomPackages) > 0 {
 		for _, c := range cfg.CustomPackages {
 			res["custom"] = append(res["custom"], c.Name)
+		}
+	}
+
+	if len(cfg.GithubReleasePackages) > 0 {
+		for _, g := range cfg.GithubReleasePackages {
+			res["github"] = append(res["github"], g.Name)
 		}
 	}
 
@@ -50,6 +60,17 @@ func (m *Manager) getVersionInstalled(k PackageKey) string {
 			return ""
 		}
 		res := executil.RunShell(cp.GetInstalledVersion)
+		if res.Code != 0 {
+			return ""
+		}
+		return strings.TrimSpace(res.Stdout)
+	}
+	if k.Kind == "github" {
+		gp := m.githubByName(k.Name)
+		if gp.GetInstalledVersion.Command == "" {
+			return ""
+		}
+		res := executil.RunShell(gp.GetInstalledVersion)
 		if res.Code != 0 {
 			return ""
 		}
@@ -81,6 +102,14 @@ func (m *Manager) getVersionAvailable(k PackageKey) string {
 			return ""
 		}
 		return strings.TrimSpace(res.Stdout)
+	}
+	if k.Kind == "github" {
+		gp := m.githubByName(k.Name)
+		rel, err := m.ghClient.GetLatestRelease(gp.Repo)
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(rel.TagName)
 	}
 
 	src := m.sourceByName(k.Source)
@@ -161,6 +190,52 @@ func (m *Manager) executeCustomWithRunner(cp config.CustomPackage, op Operation,
 	return runner.Run(cp.Name, string(op), execCmd)
 }
 
+func (m *Manager) executeGithubWithRunner(gp config.GithubReleasePackage, op Operation, runner Runner) error {
+	installed := ""
+	if gp.GetInstalledVersion.Command != "" {
+		res := executil.RunShell(gp.GetInstalledVersion)
+		if res.Code == 0 {
+			installed = strings.TrimSpace(res.Stdout)
+		}
+	}
+	if op == OpInstall && installed != "" {
+		return nil
+	}
+	if op == OpUpdate && installed == "" {
+		return nil
+	}
+	if gp.PostInstall.Command == "" {
+		return nil
+	}
+
+	rel, err := m.ghClient.GetLatestRelease(gp.Repo)
+	if err != nil {
+		return err
+	}
+	latest := strings.TrimSpace(rel.TagName)
+	if op == OpUpdate && latest != "" && installed != "" && cmpVersion(latest, installed) <= 0 {
+		return nil
+	}
+	asset, err := m.ghClient.FindAsset(rel, gp.AssetPattern)
+	if err != nil {
+		return err
+	}
+	tmpDir, err := os.MkdirTemp("", "gopak-"+gp.Name+"-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpDir)
+	path, err := m.ghClient.DownloadAsset(asset, tmpDir)
+	if err != nil {
+		return err
+	}
+	execCmd := config.Command{
+		Command:     fmt.Sprintf("latest_version=%q installed_version=%q asset_path=%q; %s", latest, installed, path, gp.PostInstall.Command),
+		RequireRoot: gp.PostInstall.RequireRoot,
+	}
+	return runner.Run(gp.Name, string(op), execCmd)
+}
+
 func (m *Manager) GetVersionInstalled(k PackageKey) string {
 	return m.getVersionInstalled(k)
 }
@@ -177,6 +252,16 @@ func (m *Manager) HasCommand(k PackageKey, op Operation) bool {
 			return cp.Install.Command != ""
 		case OpUpdate:
 			return cp.Update.Command != ""
+		}
+		return false
+	}
+	if k.Kind == "github" {
+		gp := m.githubByName(k.Name)
+		switch op {
+		case OpInstall:
+			return gp.PostInstall.Command != ""
+		case OpUpdate:
+			return gp.PostInstall.Command != ""
 		}
 		return false
 	}
@@ -200,9 +285,14 @@ func (m *Manager) Tracked() map[string][]string {
 func (m *Manager) ExecuteSelected(keys []PackageKey, op Operation, runner Runner, onDone func(PackageKey, bool, string)) error {
 	bySrc := map[string][]string{}
 	customSet := map[string]struct{}{}
+	ghSet := map[string]struct{}{}
 	for _, k := range keys {
 		if k.Kind == "custom" {
 			customSet[k.Name] = struct{}{}
+			continue
+		}
+		if k.Kind == "github" {
+			ghSet[k.Name] = struct{}{}
 			continue
 		}
 		bySrc[k.Source] = append(bySrc[k.Source], k.Name)
@@ -262,6 +352,26 @@ func (m *Manager) ExecuteSelected(keys []PackageKey, op Operation, runner Runner
 			} else {
 				if onDone != nil {
 					onDone(PackageKey{Source: "custom", Name: name, Kind: "custom"}, true, msg)
+				}
+			}
+		}()
+	}
+	for name := range ghSet {
+		name := name
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			msg := "updated"
+			if op == OpInstall {
+				msg = "installed"
+			}
+			if err := m.executeGithubWithRunner(m.githubByName(name), op, runner); err != nil {
+				if onDone != nil {
+					onDone(PackageKey{Source: "github", Name: name, Kind: "github"}, false, err.Error())
+				}
+			} else {
+				if onDone != nil {
+					onDone(PackageKey{Source: "github", Name: name, Kind: "github"}, true, msg)
 				}
 			}
 		}()

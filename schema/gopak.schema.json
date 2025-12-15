@@ -58,10 +58,31 @@
         "required": ["name"],
         "additionalProperties": false
       }
+    },
+    "github_release_packages": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/github_release_package" }
     }
   },
   "additionalProperties": false,
   "definitions": {
+    "github_release_package": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "repo": { "type": "string" },
+        "asset_pattern": { "type": "string" },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "get_installed_version": { "$ref": "#/definitions/command" },
+        "post_install": { "$ref": "#/definitions/command" },
+        "remove": { "$ref": "#/definitions/command" }
+      },
+      "required": ["name", "repo", "asset_pattern"],
+      "additionalProperties": false
+    },
     "command": {
       "oneOf": [
         { "type": "string" },

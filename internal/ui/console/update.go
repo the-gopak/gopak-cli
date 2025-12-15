@@ -22,8 +22,40 @@ type filterFunc func(status manager.VersionStatus) bool
 
 type labelFunc func(k manager.PackageKey, status manager.VersionStatus) string
 
+func versionsEqual(installed, available string) bool {
+	if installed == "" || available == "" {
+		return installed == available
+	}
+	ni := manager.NormalizeVersion(installed)
+	na := manager.NormalizeVersion(available)
+	if ni == "" || na == "" {
+		return installed == available
+	}
+	return manager.CompareVersions(na, ni) == 0
+}
+
+func versionsNeedUpdate(installed, available string) bool {
+	if installed == "" || available == "" {
+		return false
+	}
+	ni := manager.NormalizeVersion(installed)
+	na := manager.NormalizeVersion(available)
+	if ni == "" || na == "" {
+		return installed != available
+	}
+	return manager.CompareVersions(na, ni) > 0
+}
+
+func displayVersion(v string) string {
+	n := manager.NormalizeVersion(v)
+	if n != "" {
+		return n
+	}
+	return v
+}
+
 func filterForUpdate(s manager.VersionStatus) bool {
-	return s.Installed != "" && s.Available != "" && s.Installed != s.Available
+	return versionsNeedUpdate(s.Installed, s.Available)
 }
 
 func filterForInstall(s manager.VersionStatus) bool {
@@ -31,12 +63,12 @@ func filterForInstall(s manager.VersionStatus) bool {
 }
 
 func labelForUpdate(k manager.PackageKey, s manager.VersionStatus) string {
-	return fmt.Sprintf("%s/%s %s -> %s", k.Source, k.Name, s.Installed, s.Available)
+	return fmt.Sprintf("%s/%s %s -> %s", k.Source, k.Name, displayVersion(s.Installed), displayVersion(s.Available))
 }
 
 func labelForInstall(k manager.PackageKey, s manager.VersionStatus) string {
 	if s.Available != "" {
-		return fmt.Sprintf("%s/%s %s", k.Source, k.Name, s.Available)
+		return fmt.Sprintf("%s/%s %s", k.Source, k.Name, displayVersion(s.Available))
 	}
 	return fmt.Sprintf("%s/%s", k.Source, k.Name)
 }
@@ -235,18 +267,18 @@ func renderGroups(groups map[string][]string, status map[manager.PackageKey]mana
 			ins := ""
 			if s.Installed != "" || s.Available != "" {
 				if s.Available == "" {
-					cur = s.Installed
+					cur = displayVersion(s.Installed)
 				} else if s.Installed == "" {
-					ins = s.Available
-				} else if s.Installed == s.Available {
+					ins = displayVersion(s.Available)
+				} else if versionsEqual(s.Installed, s.Available) {
 					if hideUpToDate {
 						continue
 					}
-					cur = text.FgHiBlack.Sprint(s.Installed)
-					ins = text.FgHiBlack.Sprint(s.Available)
+					cur = text.FgHiBlack.Sprint(displayVersion(s.Installed))
+					ins = text.FgHiBlack.Sprint(displayVersion(s.Available))
 				} else {
-					cur = colorGreen(s.Installed)
-					ins = colorGreen(s.Available)
+					cur = colorGreen(displayVersion(s.Installed))
+					ins = colorGreen(displayVersion(s.Available))
 				}
 			}
 			tw.AppendRow(table.Row{name, cur, ins})
