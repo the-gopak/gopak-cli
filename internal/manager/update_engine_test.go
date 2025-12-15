@@ -1,6 +1,8 @@
 package manager
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gopak/gopak-cli/internal/config"
@@ -37,6 +39,30 @@ func TestGetVersionAvailable_Custom(t *testing.T) {
 	got := m.GetVersionAvailable(k)
 	if got != "2.0.0" {
 		t.Fatalf("available version mismatch: got %q, want %q", got, "2.0.0")
+	}
+}
+
+func TestGetVersionAvailableDryRun_DoesNotRunPreUpdate(t *testing.T) {
+	tmp := t.TempDir()
+	marker := filepath.Join(tmp, "marker")
+
+	cfg := config.Config{Sources: []config.Source{{
+		Type:             "package_manager",
+		Name:             "apt",
+		PreUpdate:        config.Command{Command: "echo x > " + marker},
+		GetLatestVersion: config.Command{Command: "echo 1.0.0"},
+	}}}
+	m := New(cfg)
+
+	k := PackageKey{Source: "apt", Name: "git", Kind: "source"}
+	_ = m.GetVersionAvailableDryRun(k)
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatalf("dry-run should not execute pre_update")
+	}
+
+	_ = m.GetVersionAvailable(k)
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("GetVersionAvailable should execute pre_update")
 	}
 }
 

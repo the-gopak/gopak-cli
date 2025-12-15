@@ -340,6 +340,36 @@ func (m *Manager) updateCustom(cp config.CustomPackage) error {
 	return nil
 }
 
+func (m *Manager) KeyForName(name string) (PackageKey, error) {
+	if m.isCustom(name) {
+		return PackageKey{Source: "custom", Name: name, Kind: "custom"}, nil
+	}
+	if m.isGithubRelease(name) {
+		return PackageKey{Source: "github", Name: name, Kind: "github"}, nil
+	}
+	p := m.pkgByName(name)
+	if p.Name == "" {
+		return PackageKey{}, errors.New("unknown package: " + name)
+	}
+	return PackageKey{Source: p.Source, Name: name, Kind: "source"}, nil
+}
+
+func (m *Manager) ResolveKeys(name string) ([]PackageKey, error) {
+	plan, err := m.resolve(name)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]PackageKey, 0, len(plan))
+	for _, n := range plan {
+		k, err := m.KeyForName(n)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, k)
+	}
+	return keys, nil
+}
+
 func (m *Manager) resolve(name string) ([]string, error) {
 	nodes := map[string][]string{}
 	for _, p := range m.cfg.Packages {

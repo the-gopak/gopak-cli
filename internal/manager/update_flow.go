@@ -91,6 +91,42 @@ func (m *Manager) getVersionInstalled(k PackageKey) string {
 	return ""
 }
 
+func (m *Manager) getVersionAvailableDryRun(k PackageKey) string {
+	if k.Kind == "custom" {
+		cp := m.customByName(k.Name)
+		if cp.GetLatestVersion.Command == "" {
+			return ""
+		}
+		res := executil.RunShell(cp.GetLatestVersion)
+		if res.Code != 0 {
+			return ""
+		}
+		return strings.TrimSpace(res.Stdout)
+	}
+	if k.Kind == "github" {
+		gp := m.githubByName(k.Name)
+		rel, err := m.ghClient.GetLatestRelease(gp.Repo)
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(rel.TagName)
+	}
+
+	src := m.sourceByName(k.Source)
+	if src.Name == "" {
+		return ""
+	}
+	if src.GetLatestVersion.Command != "" {
+		cmd := strings.ReplaceAll(src.GetLatestVersion.Command, "{package}", k.Name)
+		res := executil.RunShell(config.Command{Command: cmd, RequireRoot: src.GetLatestVersion.RequireRoot})
+		if res.Code != 0 {
+			return ""
+		}
+		return strings.TrimSpace(res.Stdout)
+	}
+	return ""
+}
+
 func (m *Manager) getVersionAvailable(k PackageKey) string {
 	if k.Kind == "custom" {
 		cp := m.customByName(k.Name)
@@ -242,6 +278,10 @@ func (m *Manager) GetVersionInstalled(k PackageKey) string {
 
 func (m *Manager) GetVersionAvailable(k PackageKey) string {
 	return m.getVersionAvailable(k)
+}
+
+func (m *Manager) GetVersionAvailableDryRun(k PackageKey) string {
+	return m.getVersionAvailableDryRun(k)
 }
 
 func (m *Manager) HasCommand(k PackageKey, op Operation) bool {
