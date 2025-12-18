@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"sort"
-
 	"github.com/gopak/gopak-cli/internal/config"
 	"github.com/gopak/gopak-cli/internal/manager"
 	"github.com/gopak/gopak-cli/internal/ui/console"
@@ -20,105 +17,12 @@ func init() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := config.Get()
 			m := manager.New(cfg)
-			if dryRun {
-				if len(args) == 1 {
-					keys, err := m.ResolveKeys(args[0])
-					if err != nil {
-						return err
-					}
-					for _, k := range keys {
-						ins := m.GetVersionInstalled(k)
-						av := m.GetVersionAvailableDryRun(k)
-						if ins != "" {
-							fmt.Printf("skip (already installed): %s/%s %s\n", k.Source, k.Name, manager.NormalizeVersion(ins))
-							continue
-						}
-						if av != "" {
-							fmt.Printf("install: %s/%s -> %s\n", k.Source, k.Name, manager.NormalizeVersion(av))
-						} else {
-							fmt.Printf("install: %s/%s\n", k.Source, k.Name)
-						}
-					}
-					return nil
-				}
-				groups := m.Tracked()
-				keys := make([]manager.PackageKey, 0)
-				for grp, names := range groups {
-					for _, n := range names {
-						k := manager.PackageKey{Source: grp, Name: n, Kind: manager.KindOf(grp)}
-						if !m.HasCommand(k, manager.OpInstall) {
-							continue
-						}
-						if m.GetVersionInstalled(k) != "" {
-							continue
-						}
-						keys = append(keys, k)
-					}
-				}
-				sort.Slice(keys, func(i, j int) bool {
-					if keys[i].Source == keys[j].Source {
-						return keys[i].Name < keys[j].Name
-					}
-					return keys[i].Source < keys[j].Source
-				})
-				if len(keys) == 0 {
-					fmt.Println("Nothing to install")
-					return nil
-				}
-				for _, k := range keys {
-					av := m.GetVersionAvailableDryRun(k)
-					if av != "" {
-						fmt.Printf("install: %s/%s -> %s\n", k.Source, k.Name, manager.NormalizeVersion(av))
-					} else {
-						fmt.Printf("install: %s/%s\n", k.Source, k.Name)
-					}
-				}
-				return nil
-			}
+			name := ""
 			if len(args) == 1 {
-				return m.Install(args[0])
-			}
-			if yes {
-				groups := m.Tracked()
-				keys := make([]manager.PackageKey, 0)
-				for grp, names := range groups {
-					for _, n := range names {
-						k := manager.PackageKey{Source: grp, Name: n, Kind: manager.KindOf(grp)}
-						if !m.HasCommand(k, manager.OpInstall) {
-							continue
-						}
-						if m.GetVersionInstalled(k) != "" {
-							continue
-						}
-						keys = append(keys, k)
-					}
-				}
-				sort.Slice(keys, func(i, j int) bool {
-					if keys[i].Source == keys[j].Source {
-						return keys[i].Name < keys[j].Name
-					}
-					return keys[i].Source < keys[j].Source
-				})
-				if len(keys) == 0 {
-					fmt.Println("Nothing to install")
-					return nil
-				}
-				runner := manager.NewSudoRunner()
-				defer runner.Close()
-				return m.InstallSelected(keys, runner, func(k manager.PackageKey, ok bool, msg string) {
-					if ok {
-						fmt.Println("installed: " + k.Name)
-						return
-					}
-					fmt.Println("failed:  " + k.Name)
-					if msg != "" {
-						fmt.Println(msg)
-					}
-				})
+				name = args[0]
 			}
 			ui := console.NewConsoleUI(m)
-
-			return ui.Install()
+			return ui.Install(name, dryRun, yes)
 		},
 	}
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print planned changes without executing")

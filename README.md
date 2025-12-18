@@ -58,8 +58,6 @@ Place your configuration files in the directory `~/.config/gopak/` (default). Yo
 
 On startup, `gopak` merges all `*.yaml` files in the config directory into one effective config. If a source name or a package name is duplicated across files (including between `packages` and `custom_packages`), the app exits with an error.
 
-On first run, `gopak` ensures the config directory exists and creates `~/.config/gopak/sources.yaml` from embedded defaults if missing. This file is part of the merge and contains a catalog of popular package managers.
-
 Schema support:
 - The configuration schema is published at: `https://raw.githubusercontent.com/gopak/gopak-cli/HEAD/schema/gopak.schema.json`.
 - The default sources file includes `$schema` for editor validation.
@@ -144,7 +142,7 @@ Tips for custom packages:
 
 ## Default Sources Reference
 
-On first run, embedded defaults are copied to `~/.config/gopak/sources.yaml`. You can copy the entries you need into your config under `sources:`. The same catalog is available in the repository at `internal/assets/default-sources.yaml`.
+Default sources are embedded into the binary and are always included as part of the effective config. You can copy entries you need into your own YAML files under `sources:`. The same catalog is available in the repository at `internal/assets/default-sources.yaml`.
 
 Included managers:
 - apt (Debian/Ubuntu)

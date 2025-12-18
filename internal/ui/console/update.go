@@ -73,6 +73,78 @@ func labelForInstall(k manager.PackageKey, s manager.VersionStatus) string {
 	return fmt.Sprintf("%s/%s", k.Source, k.Name)
 }
 
+func (c *ConsoleUI) Update(name string, dryRun bool, force bool) error {
+	if name != "" {
+		if !dryRun {
+			return c.m.UpdateOne(name)
+		}
+		k, err := c.m.KeyForName(name)
+		if err != nil {
+			return err
+		}
+		ins := c.m.GetVersionInstalled(k)
+		if ins == "" {
+			fmt.Printf("not installed: %s/%s\n", k.Source, k.Name)
+			return nil
+		}
+		av := c.m.GetVersionAvailableDryRun(k)
+		if versionsNeedUpdate(ins, av) {
+			fmt.Printf("update: %s/%s %s -> %s\n", k.Source, k.Name, displayVersion(ins), displayVersion(av))
+			return nil
+		}
+		fmt.Printf("up-to-date: %s/%s %s\n", k.Source, k.Name, displayVersion(ins))
+		return nil
+	}
+
+	return c.packageSelectionFlow(
+		manager.OpUpdate,
+		filterForUpdate,
+		labelForUpdate,
+		"Nothing to update",
+		"Select packages to update",
+		"Proceed to update selected?",
+		dryRun,
+		force,
+	)
+}
+
+func (c *ConsoleUI) Install(name string, dryRun bool, force bool) error {
+	if name != "" {
+		if !dryRun {
+			return c.m.Install(name)
+		}
+		keys, err := c.m.ResolveKeys(name)
+		if err != nil {
+			return err
+		}
+		for _, k := range keys {
+			ins := c.m.GetVersionInstalled(k)
+			av := c.m.GetVersionAvailableDryRun(k)
+			if ins != "" {
+				fmt.Printf("skip (already installed): %s/%s %s\n", k.Source, k.Name, displayVersion(ins))
+				continue
+			}
+			if av != "" {
+				fmt.Printf("install: %s/%s -> %s\n", k.Source, k.Name, displayVersion(av))
+			} else {
+				fmt.Printf("install: %s/%s\n", k.Source, k.Name)
+			}
+		}
+		return nil
+	}
+
+	return c.packageSelectionFlow(
+		manager.OpInstall,
+		filterForInstall,
+		labelForInstall,
+		"Nothing to install",
+		"Select packages to install",
+		"Proceed to install selected?",
+		dryRun,
+		force,
+	)
+}
+
 func (c *ConsoleUI) packageSelectionFlow(
 	op manager.Operation,
 	filter filterFunc,
@@ -80,6 +152,8 @@ func (c *ConsoleUI) packageSelectionFlow(
 	emptyMsg string,
 	selectMsg string,
 	confirmMsg string,
+	dryRun bool,
+	force bool,
 ) error {
 	groups := c.m.Tracked()
 	status := map[manager.PackageKey]manager.VersionStatus{}
@@ -115,7 +189,12 @@ func (c *ConsoleUI) packageSelectionFlow(
 				mu.Unlock()
 				updates <- struct{}{}
 
-				av := c.m.GetVersionAvailable(k)
+				av := ""
+				if dryRun {
+					av = c.m.GetVersionAvailableDryRun(k)
+				} else {
+					av = c.m.GetVersionAvailable(k)
+				}
 				mu.Lock()
 				s = status[k]
 				s.Available = av
@@ -151,6 +230,44 @@ func (c *ConsoleUI) packageSelectionFlow(
 		fmt.Println(emptyMsg)
 		return nil
 	}
+	if dryRun {
+		return nil
+	}
+	if force {
+		keysSelected := append([]manager.PackageKey{}, need...)
+		runner := manager.NewSudoRunner()
+		defer runner.Close()
+
+		var wgE sync.WaitGroup
+		evCh := make(chan packageEvent, 16)
+		wgE.Add(1)
+		go func() {
+			defer wgE.Done()
+			_ = c.m.ExecuteSelected(keysSelected, op, runner, func(k manager.PackageKey, ok bool, msg string) {
+				evCh <- packageEvent{k: k, ok: ok, msg: msg}
+			})
+		}()
+		go func() { wgE.Wait(); close(evCh) }()
+
+		for e := range evCh {
+			if e.ok {
+				action := e.msg
+				if action == "" {
+					action = "updated"
+					if op == manager.OpInstall {
+						action = "installed"
+					}
+				}
+				fmt.Println(colorGreen(action + ": " + e.k.Name))
+			} else {
+				fmt.Println(colorRed("failed:  " + e.k.Name))
+				if e.msg != "" {
+					fmt.Println(e.msg)
+				}
+			}
+		}
+		return nil
+	}
 
 	labels := make([]string, 0, len(need))
 	labelByKey := map[string]manager.PackageKey{}
@@ -173,7 +290,6 @@ func (c *ConsoleUI) packageSelectionFlow(
 	for _, l := range selectedLabels {
 		keysSelected = append(keysSelected, labelByKey[l])
 	}
-	fmt.Printf("%v\n", keysSelected)
 
 	ok := false
 	if err := survey.AskOne(&survey.Confirm{Message: confirmMsg, Default: true}, &ok); err != nil {
@@ -215,28 +331,6 @@ func (c *ConsoleUI) packageSelectionFlow(
 		}
 	}
 	return nil
-}
-
-func (c *ConsoleUI) Update() error {
-	return c.packageSelectionFlow(
-		manager.OpUpdate,
-		filterForUpdate,
-		labelForUpdate,
-		"Nothing to update",
-		"Select packages to update",
-		"Proceed to update selected?",
-	)
-}
-
-func (c *ConsoleUI) Install() error {
-	return c.packageSelectionFlow(
-		manager.OpInstall,
-		filterForInstall,
-		labelForInstall,
-		"Nothing to install",
-		"Select packages to install",
-		"Proceed to install selected?",
-	)
 }
 
 func renderGroups(groups map[string][]string, status map[manager.PackageKey]manager.VersionStatus, hideUpToDate bool) string {
