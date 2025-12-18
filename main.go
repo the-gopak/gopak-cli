@@ -1,7 +1,13 @@
 package main
 
-import "github.com/gopak/gopak-cli/cmd"
+import (
+	"os"
+
+	"github.com/gopak/gopak-cli/cmd"
+)
 
 func main() {
-	cmd.Execute()
+	if err := cmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }

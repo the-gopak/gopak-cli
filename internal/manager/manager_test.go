@@ -6,6 +6,42 @@ import (
 	"github.com/gopak/gopak-cli/internal/config"
 )
 
+func TestRemoveUnknownPackage(t *testing.T) {
+	m := New(config.Config{})
+	if err := m.Remove("missing"); err == nil {
+		t.Fatalf("expected error for unknown package")
+	}
+}
+
+func TestRemoveUnknownSource(t *testing.T) {
+	cfg := config.Config{
+		Packages: []config.Package{{Name: "git", Source: "apt"}},
+	}
+	m := New(cfg)
+	err := m.Remove("git")
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if err.Error() != "unknown source: apt" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRemoveMissingSourceRemoveScript(t *testing.T) {
+	cfg := config.Config{
+		Sources:  []config.Source{{Type: "package_manager", Name: "apt", Install: config.Command{Command: "echo install {package_list}"}}},
+		Packages: []config.Package{{Name: "git", Source: "apt"}},
+	}
+	m := New(cfg)
+	err := m.Remove("git")
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if err.Error() != "missing remove script for source: apt" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestResolveOrder(t *testing.T) {
 	cfg := config.Config{
 		Sources: []config.Source{{Type: "package_manager", Name: "apt", Install: config.Command{Command: "echo install {package_list}"}}},

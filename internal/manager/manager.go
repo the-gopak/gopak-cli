@@ -218,7 +218,16 @@ func (m *Manager) Remove(name string) error {
 		return m.runCtx(name, "remove", gp.Remove)
 	}
 	p := m.pkgByName(name)
+	if p.Name == "" {
+		return errors.New("unknown package: " + name)
+	}
 	s := m.sourceByName(p.Source)
+	if s.Name == "" {
+		return fmt.Errorf("unknown source: %s", p.Source)
+	}
+	if s.Remove.Command == "" {
+		return fmt.Errorf("missing remove script for source: %s", s.Name)
+	}
 	cmd := strings.ReplaceAll(s.Remove.Command, "{package_list}", name)
 	return m.runCtx(name, "remove", config.Command{Command: cmd, RequireRoot: s.Remove.RequireRoot})
 }
@@ -457,6 +466,13 @@ func (m *Manager) runCtx(name string, step string, command config.Command) error
 		fmt.Print(res.Stderr)
 	}
 	if res.Code != 0 {
+		errLine := strings.TrimSpace(res.Stderr)
+		if i := strings.IndexByte(errLine, '\n'); i >= 0 {
+			errLine = errLine[:i]
+		}
+		if errLine != "" {
+			return fmt.Errorf("command failed for %s [%s]: %s (exit %d)", name, step, errLine, res.Code)
+		}
 		return fmt.Errorf("command failed for %s [%s]: exit %d", name, step, res.Code)
 	}
 	return nil
