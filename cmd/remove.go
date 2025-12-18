@@ -8,6 +8,7 @@ import (
 )
 
 func init() {
+	var yes bool
 	cmd := &cobra.Command{
 		Use:   "remove <name>",
 		Short: "Remove a package",
@@ -16,8 +17,9 @@ func init() {
 			cfg := config.Get()
 			m := manager.New(cfg)
 			ui := console.NewConsoleUI(m)
-			return ui.RunRemoveImperative(args[0])
+			return ui.RunRemoveImperative(args[0], yes)
 		},
 	}
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "assume yes and remove without prompting")
 	rootCmd.AddCommand(cmd)
 }

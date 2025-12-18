@@ -250,8 +250,6 @@ func (m *Manager) UpdateOne(name string) error {
 	return nil
 }
 
-// UpdateAll removed in favor of UpdateAll(ctx, reporter, runner)
-
 func (m *Manager) List() error {
 	for _, p := range m.cfg.Packages {
 		logging.Info("pkg: " + p.Name)
