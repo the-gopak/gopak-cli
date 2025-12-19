@@ -73,6 +73,7 @@ Top-level keys:
 - `sources`: list of package manager templates (install/remove/update/search/pre_update/get_installed_version/get_latest_version). These are shell snippets with placeholders.
 - `packages`: list of simple packages managed by a specific `source`.
 - `custom_packages`: list of custom packages managed by arbitrary scripts.
+- `github_release_packages`: list of packages from GitHub releases.
 
 Schema (see `internal/config/types.go`):
 
@@ -120,14 +121,28 @@ custom_packages:
     install:
       command: "tar -C /usr/local/bin -xzf /tmp/mytool.tgz mytool"
       require_root: true
+
+github_release_packages:
+  - name: mygithubtool
+    repo: myorg/mygithubtool
+    asset_pattern: "*x86_64-unknown-linux-gnu.tar.gz"
+    depends_on: [git]
+    get_installed_version: "mygithubtool --version | head -n1 | awk '{print $2}' | sed 's/^v//'"
+    post_install:
+      command: |
+        notify-send "Installed mygithubtool"
+      require_root: true
+    remove:
+      command: "rm -f /usr/local/bin/mygithubtool"
+      require_root: true
 ```
 
 Notes:
 - `{package_list}` is replaced with the space-separated list provided by `gopak` (typically a single name).
 - `{query}` is replaced in `search` commands.
 - `{package}` is replaced with a single package name when executing `get_installed_version` / `get_latest_version` commands for package managers.
-- `depends_on` is supported for both `packages` and `custom_packages`. `gopak` computes a topological order and installs dependencies first.
- - `pre_update` for a source is executed at most once per process for a given script (identified by hash) before any `get_latest_version` is run for that source. `gopak` does not add `sudo` around `pre_update`; if you need root-only behavior, handle it inside the script (e.g. `if [ "$(id -u)" -eq 0 ]; then ...; fi`).
+- `depends_on` is supported for `packages`, `custom_packages` and `github_release_packages`. `gopak` computes a topological order and installs dependencies first.
+- `pre_update` for a source is executed at most once per process for a given script (identified by hash) before any `get_latest_version` is run for that source. `gopak` does not add `sudo` around `pre_update`; if you need root-only behavior, handle it inside the script (e.g. `if [ "$(id -u)" -eq 0 ]; then ...; fi`).
 
 ### Permissions: require_root
 
