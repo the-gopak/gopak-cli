@@ -96,3 +96,24 @@ sources:
     get_latest_version:
       command: "origin=$(flatpak info {package} 2>/dev/null | sed -n 's/^[[:space:]]*Origin:[[:space:]]*//p' | head -n1); if [ -n \"$origin\" ]; then flatpak remote-info \"$origin\" {package} 2>/dev/null | sed -n 's/^[[:space:]]*Version:[[:space:]]*//p' | head -n1; fi || true"
       require_root: false
+
+  - type: package_manager
+    name: pipx
+    install:
+      command: "printf \"%s\n\" {package_list} | xargs -n1 pipx install"
+      require_root: false
+    remove:
+      command: "printf \"%s\n\" {package_list} | xargs -n1 pipx uninstall"
+      require_root: false
+    update:
+      command: "printf \"%s\n\" {package_list} | xargs -n1 pipx upgrade"
+      require_root: false
+    search:
+        command: "echo \"Please use https://pypi.org/search (via a browser).\""
+        require_root: false
+    get_installed_version:
+      command: "pipx runpip {package} show {package} | awk '/^Version:/\{print $2\}'"
+      require_root: false
+    get_latest_version:
+      command: "pipx runpip {package} index versions {package} | sed -n 's/.*(\(.*\)).*/\1/p'"
+      require_root: false

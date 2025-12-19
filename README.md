@@ -153,6 +153,7 @@ Included managers:
 - snap (Snapcraft)
 - flatpak
 - brew (Linuxbrew/Homebrew)
+- pipx
 
 Each entry defines commands for:
 - `install`: install one or more packages
