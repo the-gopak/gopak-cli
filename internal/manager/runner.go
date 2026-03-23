@@ -43,7 +43,7 @@ func (r *SudoRunner) ensureKeepAliveStarted() {
 	})
 }
 
-func (r *SudoRunner) ensureRootAccess() bool {
+func (r *SudoRunner) ensureRootAccess(name, command string) bool {
 	if os.Geteuid() == 0 {
 		return true
 	}
@@ -52,6 +52,7 @@ func (r *SudoRunner) ensureRootAccess() bool {
 	if r.authed {
 		return true
 	}
+	fmt.Printf("Authorizing to install %s: %s\n", name, command)
 	vcmd := exec.Command("sudo", "-v")
 	vcmd.Stdin = os.Stdin
 	vcmd.Stdout = os.Stdout
@@ -68,7 +69,7 @@ func (r *SudoRunner) ensureRootAccess() bool {
 func (r *SudoRunner) Run(name, step string, cmd config.Command) error {
 	final := cmd.Command
 	if cmd.RequireRoot {
-		if !r.ensureRootAccess() {
+		if !r.ensureRootAccess(name, cmd.Command) {
 			return fmt.Errorf("sudo auth not granted for %s [%s]", name, step)
 		}
 
