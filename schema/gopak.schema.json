@@ -30,7 +30,7 @@
         "properties": {
           "name": { "type": "string" },
           "source": { "type": "string" },
-          "executable": { "type": "string" },
+          "executable": { "$ref": "#/definitions/executable" },
           "depends_on": {
             "type": "array",
             "items": { "type": "string" }
@@ -46,7 +46,7 @@
         "type": "object",
         "properties": {
           "name": { "type": "string" },
-          "executable": { "type": "string" },
+          "executable": { "$ref": "#/definitions/executable" },
           "depends_on": {
             "type": "array",
             "items": { "type": "string" }
@@ -73,7 +73,7 @@
       "type": "object",
       "properties": {
         "name": { "type": "string" },
-        "executable": { "type": "string" },
+        "executable": { "$ref": "#/definitions/executable" },
         "repo": { "type": "string" },
         "asset_pattern": { "type": "string" },
         "depends_on": {
@@ -98,6 +98,16 @@
           },
           "required": ["command"],
           "additionalProperties": false
+        }
+      ]
+    },
+    "executable": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
         }
       ]
     }

@@ -9,17 +9,19 @@ import (
 	"github.com/gopak/gopak-cli/internal/logging"
 )
 
-func (m *Manager) executableForPackage(name string) string {
-	if cp := m.customByName(name); cp.Name != "" && cp.Executable != "" {
-		return cp.Executable
+// executableForPackage returns the binary and any pre-set arguments for the
+// package. If no executable is configured, the package name is used as the binary.
+func (m *Manager) executableForPackage(name string) (string, []string) {
+	if cp := m.customByName(name); cp.Name != "" && cp.Executable.IsSet() {
+		return cp.Executable.Binary(), cp.Executable.Args()
 	}
-	if gp := m.githubByName(name); gp.Name != "" && gp.Executable != "" {
-		return gp.Executable
+	if gp := m.githubByName(name); gp.Name != "" && gp.Executable.IsSet() {
+		return gp.Executable.Binary(), gp.Executable.Args()
 	}
-	if p := m.pkgByName(name); p.Name != "" && p.Executable != "" {
-		return p.Executable
+	if p := m.pkgByName(name); p.Name != "" && p.Executable.IsSet() {
+		return p.Executable.Binary(), p.Executable.Args()
 	}
-	return name
+	return name, nil
 }
 
 func (m *Manager) Exec(packageName string, extraArgs []string, noCache bool, ttl time.Duration) error {
@@ -54,8 +56,8 @@ func (m *Manager) Exec(packageName string, extraArgs []string, noCache bool, ttl
 		lock = nil
 	}
 
-	binary := m.executableForPackage(packageName)
-	child := exec.Command(binary, extraArgs...)
+	binary, baseArgs := m.executableForPackage(packageName)
+	child := exec.Command(binary, append(baseArgs, extraArgs...)...)
 	child.Stdin = os.Stdin
 	child.Stdout = os.Stdout
 	child.Stderr = os.Stderr
