@@ -98,27 +98,6 @@ sources:
       require_root: false
 
   - type: package_manager
-    name: pipx
-    install:
-      command: "pipx install {package}"
-      require_root: false
-    remove:
-      command: "pipx uninstall {package}"
-      require_root: false
-    update:
-      command: "pipx upgrade {package}"
-      require_root: false
-    search:
-      command: "python -m pip index versions {query} 2>/dev/null || true"
-      require_root: false
-    get_installed_version:
-      command: "pipx list 2>/dev/null | awk -v p=\"{package}\" '$1==\"package\" && $2==p {v=$3; sub(/,$/,\"\",v); print v; exit}' || true"
-      require_root: false
-    get_latest_version:
-      command: "python -m pip index versions {package} 2>/dev/null | head -n1 | awk -F'[()]' '{print $2}'"
-      require_root: false
-
-  - type: package_manager
     name: npm
     install:
       command: "npm install -g {package_list}"
@@ -158,25 +137,4 @@ sources:
       require_root: false
     get_latest_version:
       command: "npm view {package} version 2>/dev/null || true"
-      require_root: false
-
-  - type: package_manager
-    name: docker
-    install:
-      command: "docker pull {package}"
-      require_root: false
-    remove:
-      command: "docker rmi {package} 2>/dev/null || true"
-      require_root: false
-    update:
-      command: "docker pull {package}"
-      require_root: false
-    search:
-      command: "docker search {query}"
-      require_root: false
-    get_installed_version:
-      command: "docker images -q {package} 2>/dev/null | head -n1 || echo 'not installed'"
-      require_root: false
-    get_latest_version:
-      command: "docker images -q {package} 2>/dev/null | head -n1 || echo 'available'"
       require_root: false
