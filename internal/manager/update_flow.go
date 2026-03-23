@@ -80,13 +80,6 @@ func (m *Manager) getVersionInstalled(k PackageKey) string {
 	if src.Name == "" {
 		return ""
 	}
-	if src.Name == "docker" {
-		v, err := dockerInstalledConfigDigest(k.Name)
-		if err != nil {
-			return ""
-		}
-		return v
-	}
 	if src.GetInstalledVersion.Command != "" {
 		expanded, err := expandCommandForName(src.GetInstalledVersion, k.Name)
 		if err != nil {
@@ -125,13 +118,6 @@ func (m *Manager) getVersionAvailableDryRun(k PackageKey) string {
 	src := m.sourceByName(k.Source)
 	if src.Name == "" {
 		return ""
-	}
-	if src.Name == "docker" {
-		v, err := dockerRemoteConfigDigestForCurrentPlatform(k.Name)
-		if err != nil {
-			return ""
-		}
-		return v
 	}
 	if src.GetLatestVersion.Command != "" {
 		expanded, err := expandCommandForName(src.GetLatestVersion, k.Name)
@@ -172,13 +158,6 @@ func (m *Manager) getVersionAvailable(k PackageKey) string {
 	m.ensurePreUpdate(src)
 	if src.Name == "" {
 		return ""
-	}
-	if src.Name == "docker" {
-		v, err := dockerRemoteConfigDigestForCurrentPlatform(k.Name)
-		if err != nil {
-			return ""
-		}
-		return v
 	}
 	if src.GetLatestVersion.Command != "" {
 		expanded, err := expandCommandForName(src.GetLatestVersion, k.Name)
