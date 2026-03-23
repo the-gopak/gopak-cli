@@ -192,8 +192,11 @@ func (m *Manager) Install(name string) error {
 		} else {
 			p := m.pkgByName(n)
 			s := m.sourceByName(p.Source)
-			cmd := strings.ReplaceAll(s.Install.Command, "{package_list}", n)
-			if err := m.runCtx(n, "install", config.Command{Command: cmd, RequireRoot: s.Install.RequireRoot}); err != nil {
+			expanded, err := expandCommandForName(s.Install, n)
+			if err != nil {
+				return fmt.Errorf("invalid placeholders for source %s [install]: %w", s.Name, err)
+			}
+			if err := m.runCtx(n, "install", expanded); err != nil {
 				return err
 			}
 			logging.Success("installed: " + n)
@@ -228,8 +231,11 @@ func (m *Manager) Remove(name string) error {
 	if s.Remove.Command == "" {
 		return fmt.Errorf("missing remove script for source: %s", s.Name)
 	}
-	cmd := strings.ReplaceAll(s.Remove.Command, "{package_list}", name)
-	return m.runCtx(name, "remove", config.Command{Command: cmd, RequireRoot: s.Remove.RequireRoot})
+	expanded, err := expandCommandForName(s.Remove, name)
+	if err != nil {
+		return fmt.Errorf("invalid placeholders for source %s [remove]: %w", s.Name, err)
+	}
+	return m.runCtx(name, "remove", expanded)
 }
 
 func (m *Manager) UpdateOne(name string) error {
@@ -242,8 +248,11 @@ func (m *Manager) UpdateOne(name string) error {
 	}
 	p := m.pkgByName(name)
 	s := m.sourceByName(p.Source)
-	cmd := strings.ReplaceAll(s.Update.Command, "{package_list}", name)
-	if err := m.runCtx(name, "update", config.Command{Command: cmd, RequireRoot: s.Update.RequireRoot}); err != nil {
+	expanded, err := expandCommandForName(s.Update, name)
+	if err != nil {
+		return fmt.Errorf("invalid placeholders for source %s [update]: %w", s.Name, err)
+	}
+	if err := m.runCtx(name, "update", expanded); err != nil {
 		return err
 	}
 	logging.Success("updated: " + name)

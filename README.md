@@ -50,7 +50,87 @@ gopak update            # all
 gopak update neovim     # one
 gopak search ripgrep
 gopak validate          # only validate config
+gopak exec -- prettier --write .
+gopak exec --no-cache -- mytool --help
 ```
+
+## exec
+
+```bash
+gopak exec [--no-cache] -- <package> [args...]
+```
+
+Updates the package if needed, then immediately runs it. This is a convenient way to always run an up-to-date version of a tool without manually invoking `update` first.
+
+How it works:
+
+1. Checks whether an update was performed recently (within `exec_cache_ttl`, default `3h`).
+2. If the cache is stale (or `--no-cache` is passed), runs `update` for that package.
+3. Runs the package binary, forwarding all extra `[args...]` to it.
+
+The binary that gets executed is determined by the `executable` field on the package. If `executable` is not set, the package name is used as the binary name.
+
+`executable` accepts either a plain string (binary name) or an array (binary + fixed arguments that always come first):
+
+```yaml
+executable: mytool                     # runs: mytool [extra args]
+executable: ["npx", "-y", "prettier"]  # runs: npx -y prettier [extra args]
+```
+
+Options:
+- `--no-cache` — bypass the update-check cache and force a fresh update check before running.
+
+To change how often the update check fires, set `exec_cache_ttl` in your config (any Go duration string, e.g. `24h`, `30m`):
+
+```yaml
+exec_cache_ttl: 24h
+```
+
+### Example: custom package
+
+Declare a custom package for a locally-built tool and use `exec` to keep it fresh:
+
+```yaml
+custom_packages:
+  - name: mytool
+    executable: mytool          # optional: defaults to the package name
+    get_latest_version: "curl -s https://example.com/latest-version.txt"
+    get_installed_version: "mytool --version 2>&1 | grep -oP '[0-9]+\\.[0-9]+\\.[0-9]+'"
+    download:
+      command: "curl -fsSL -o /tmp/mytool.tar.gz https://example.com/mytool-linux-amd64.tar.gz"
+      require_root: false
+    install:
+      command: "tar -C /usr/local/bin -xzf /tmp/mytool.tar.gz mytool"
+      require_root: true
+    remove:
+      command: "rm -f /usr/local/bin/mytool"
+      require_root: true
+```
+
+Then instead of manually installing and updating:
+
+```bash
+gopak exec -- mytool --flag value
+```
+
+### Example: npx package
+
+To run an npm tool via `npx -y` without typing the full command every time, set `executable` to the array form:
+
+```yaml
+packages:
+  - name: prettier
+    source: npm
+    executable: ["npx", "-y", "prettier"]
+```
+
+Then instead of `npx -y prettier --write .`:
+
+```bash
+gopak exec -- prettier --write .
+```
+
+`exec` looks up `prettier` by its gopak name, resolves the executable to `npx -y prettier`, and appends any extra arguments. On the first run (or when the cache is stale) it also runs `update` first to keep the package current.
 
 ## Configuration
 
@@ -73,6 +153,7 @@ Top-level keys:
 - `sources`: list of package manager templates (install/remove/update/search/pre_update/get_installed_version/get_latest_version). These are shell snippets with placeholders.
 - `packages`: list of simple packages managed by a specific `source`.
 - `custom_packages`: list of custom packages managed by arbitrary scripts.
+- `github_release_packages`: list of packages from GitHub releases.
 
 Schema (see `internal/config/types.go`):
 
@@ -120,14 +201,28 @@ custom_packages:
     install:
       command: "tar -C /usr/local/bin -xzf /tmp/mytool.tgz mytool"
       require_root: true
+
+github_release_packages:
+  - name: mygithubtool
+    repo: myorg/mygithubtool
+    asset_pattern: "*x86_64-unknown-linux-gnu.tar.gz"
+    depends_on: [git]
+    get_installed_version: "mygithubtool --version | head -n1 | awk '{print $2}' | sed 's/^v//'"
+    post_install:
+      command: |
+        notify-send "Installed mygithubtool"
+      require_root: true
+    remove:
+      command: "rm -f /usr/local/bin/mygithubtool"
+      require_root: true
 ```
 
 Notes:
 - `{package_list}` is replaced with the space-separated list provided by `gopak` (typically a single name).
 - `{query}` is replaced in `search` commands.
 - `{package}` is replaced with a single package name when executing `get_installed_version` / `get_latest_version` commands for package managers.
-- `depends_on` is supported for both `packages` and `custom_packages`. `gopak` computes a topological order and installs dependencies first.
- - `pre_update` for a source is executed at most once per process for a given script (identified by hash) before any `get_latest_version` is run for that source. `gopak` does not add `sudo` around `pre_update`; if you need root-only behavior, handle it inside the script (e.g. `if [ "$(id -u)" -eq 0 ]; then ...; fi`).
+- `depends_on` is supported for `packages`, `custom_packages` and `github_release_packages`. `gopak` computes a topological order and installs dependencies first.
+- `pre_update` for a source is executed at most once per process for a given script (identified by hash) before any `get_latest_version` is run for that source. `gopak` does not add `sudo` around `pre_update`; if you need root-only behavior, handle it inside the script (e.g. `if [ "$(id -u)" -eq 0 ]; then ...; fi`).
 
 ### Permissions: require_root
 
