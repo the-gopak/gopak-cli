@@ -4,10 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
-
-	"github.com/gopak/gopak-cli/internal/logging"
 )
 
 type execCache struct {
@@ -70,20 +67,3 @@ func (c *execCache) Touch(name string) {
 	c.Entries[name] = time.Now()
 }
 
-func acquireExecLock(pkg string) (*os.File, error) {
-	dir := execCacheDir()
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return nil, err
-	}
-	path := execLockPath(pkg)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return nil, err
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		logging.Debug("exec: flock failed: " + err.Error())
-		return nil, err
-	}
-	return f, nil
-}
