@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gopak/gopak-cli/internal/assets"
+	"gopkg.in/yaml.v3"
 )
 
 func TestLoadFromFiles_MergeOK(t *testing.T) {
@@ -172,6 +175,16 @@ sources:
 	}
 	if len(cfg.Sources) != 1 || cfg.Sources[0].Name != "snap" {
 		t.Fatalf("defaults not loaded correctly")
+	}
+}
+
+func TestEmbeddedDefaultSources_ValidYAMLAndSchema(t *testing.T) {
+	var cfg Config
+	if err := yaml.Unmarshal(assets.DefaultSources, &cfg); err != nil {
+		t.Fatalf("embedded default-sources.yaml must be valid YAML: %v", err)
+	}
+	if err := ValidateAgainstSchema(cfg); err != nil {
+		t.Fatalf("embedded default-sources.yaml must pass schema validation: %v", err)
 	}
 }
 

@@ -30,6 +30,7 @@
         "properties": {
           "name": { "type": "string" },
           "source": { "type": "string" },
+          "executable": { "type": "string" },
           "depends_on": {
             "type": "array",
             "items": { "type": "string" }
@@ -45,6 +46,7 @@
         "type": "object",
         "properties": {
           "name": { "type": "string" },
+          "executable": { "type": "string" },
           "depends_on": {
             "type": "array",
             "items": { "type": "string" }
@@ -62,7 +64,8 @@
     "github_release_packages": {
       "type": "array",
       "items": { "$ref": "#/definitions/github_release_package" }
-    }
+    },
+    "exec_cache_ttl": { "type": "string" }
   },
   "additionalProperties": false,
   "definitions": {
@@ -70,6 +73,7 @@
       "type": "object",
       "properties": {
         "name": { "type": "string" },
+        "executable": { "type": "string" },
         "repo": { "type": "string" },
         "asset_pattern": { "type": "string" },
         "depends_on": {

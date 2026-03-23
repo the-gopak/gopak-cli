@@ -80,9 +80,19 @@ func (m *Manager) getVersionInstalled(k PackageKey) string {
 	if src.Name == "" {
 		return ""
 	}
+	if src.Name == "docker" {
+		v, err := dockerInstalledConfigDigest(k.Name)
+		if err != nil {
+			return ""
+		}
+		return v
+	}
 	if src.GetInstalledVersion.Command != "" {
-		cmd := strings.ReplaceAll(src.GetInstalledVersion.Command, "{package}", k.Name)
-		res := executil.RunShell(config.Command{Command: cmd, RequireRoot: src.GetInstalledVersion.RequireRoot})
+		expanded, err := expandCommandForName(src.GetInstalledVersion, k.Name)
+		if err != nil {
+			return ""
+		}
+		res := executil.RunShell(expanded)
 		if res.Code != 0 {
 			return ""
 		}
@@ -116,9 +126,19 @@ func (m *Manager) getVersionAvailableDryRun(k PackageKey) string {
 	if src.Name == "" {
 		return ""
 	}
+	if src.Name == "docker" {
+		v, err := dockerRemoteConfigDigestForCurrentPlatform(k.Name)
+		if err != nil {
+			return ""
+		}
+		return v
+	}
 	if src.GetLatestVersion.Command != "" {
-		cmd := strings.ReplaceAll(src.GetLatestVersion.Command, "{package}", k.Name)
-		res := executil.RunShell(config.Command{Command: cmd, RequireRoot: src.GetLatestVersion.RequireRoot})
+		expanded, err := expandCommandForName(src.GetLatestVersion, k.Name)
+		if err != nil {
+			return ""
+		}
+		res := executil.RunShell(expanded)
 		if res.Code != 0 {
 			return ""
 		}
@@ -153,9 +173,19 @@ func (m *Manager) getVersionAvailable(k PackageKey) string {
 	if src.Name == "" {
 		return ""
 	}
+	if src.Name == "docker" {
+		v, err := dockerRemoteConfigDigestForCurrentPlatform(k.Name)
+		if err != nil {
+			return ""
+		}
+		return v
+	}
 	if src.GetLatestVersion.Command != "" {
-		cmd := strings.ReplaceAll(src.GetLatestVersion.Command, "{package}", k.Name)
-		res := executil.RunShell(config.Command{Command: cmd, RequireRoot: src.GetLatestVersion.RequireRoot})
+		expanded, err := expandCommandForName(src.GetLatestVersion, k.Name)
+		if err != nil {
+			return ""
+		}
+		res := executil.RunShell(expanded)
 		if res.Code != 0 {
 			return ""
 		}
@@ -358,15 +388,40 @@ func (m *Manager) ExecuteSelected(keys []PackageKey, op Operation, runner Runner
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			cmdStr := strings.ReplaceAll(srcCmd.Command, "{package_list}", strings.Join(names, " "))
-			cmd := config.Command{Command: cmdStr, RequireRoot: srcCmd.RequireRoot}
-			err := runner.Run(src, string(op)+"-group", cmd)
+			group, expanded, err := expandCommandForNames(srcCmd, names)
+			msgOK := "updated"
+			if op == OpInstall {
+				msgOK = "installed"
+			}
+			if err != nil {
+				errMsg := err.Error()
+				for _, n := range names {
+					if onDone != nil {
+						onDone(PackageKey{Source: src, Name: n, Kind: KindOf(src)}, false, errMsg)
+					}
+				}
+				return
+			}
+
+			if !group {
+				for i, n := range names {
+					err := runner.Run(n, string(op), expanded[i])
+					ok := err == nil
+					msg := msgOK
+					if err != nil {
+						msg = err.Error()
+					}
+					if onDone != nil {
+						onDone(PackageKey{Source: src, Name: n, Kind: KindOf(src)}, ok, msg)
+					}
+				}
+				return
+			}
+
+			err = runner.Run(src, string(op)+"-group", expanded[0])
 			for _, n := range names {
 				ok := err == nil
-				msg := "updated"
-				if op == OpInstall {
-					msg = "installed"
-				}
+				msg := msgOK
 				if err != nil {
 					msg = err.Error()
 				}

@@ -36,6 +36,9 @@ func LoadFromFiles(files []string) (Config, error) {
 	if err := ValidateNoDuplicates(combined); err != nil {
 		return Config{}, err
 	}
+	if err := ValidatePlaceholders(combined); err != nil {
+		return Config{}, err
+	}
 	current = combined
 	return combined, nil
 }
@@ -73,6 +76,9 @@ func LoadDefaultsAndFiles(defaultsYAML []byte, files []string) (Config, error) {
 		merged = mergeConfig(merged, part)
 	}
 	if err := ValidateNoDuplicates(merged); err != nil {
+		return Config{}, err
+	}
+	if err := ValidatePlaceholders(merged); err != nil {
 		return Config{}, err
 	}
 	current = merged
@@ -151,7 +157,12 @@ func mergeConfig(base, overlay Config) Config {
 	gh = append(gh, base.GithubReleasePackages...)
 	gh = append(gh, overlay.GithubReleasePackages...)
 
-	return Config{Sources: sources, Packages: packages, CustomPackages: custom, GithubReleasePackages: gh}
+	execCacheTTL := base.ExecCacheTTL
+	if overlay.ExecCacheTTL != "" {
+		execCacheTTL = overlay.ExecCacheTTL
+	}
+
+	return Config{Sources: sources, Packages: packages, CustomPackages: custom, GithubReleasePackages: gh, ExecCacheTTL: execCacheTTL}
 }
 
 func mergeSource(a, b Source) Source {

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -19,13 +20,15 @@ type Source struct {
 }
 
 type Package struct {
-	Name      string   `mapstructure:"name" yaml:"name" json:"name"`
-	Source    string   `mapstructure:"source" yaml:"source" json:"source"`
-	DependsOn []string `mapstructure:"depends_on" yaml:"depends_on" json:"depends_on,omitempty"`
+	Name       string   `mapstructure:"name" yaml:"name" json:"name"`
+	Source     string   `mapstructure:"source" yaml:"source" json:"source"`
+	DependsOn  []string `mapstructure:"depends_on" yaml:"depends_on" json:"depends_on,omitempty"`
+	Executable string   `mapstructure:"executable" yaml:"executable" json:"executable,omitempty"`
 }
 
 type CustomPackage struct {
 	Name                string   `mapstructure:"name" yaml:"name" json:"name"`
+	Executable          string   `mapstructure:"executable" yaml:"executable" json:"executable,omitempty"`
 	DependsOn           []string `mapstructure:"depends_on" yaml:"depends_on" json:"depends_on,omitempty"`
 	GetInstalledVersion Command  `mapstructure:"get_installed_version" yaml:"get_installed_version" json:"get_installed_version"`
 	GetLatestVersion    Command  `mapstructure:"get_latest_version" yaml:"get_latest_version" json:"get_latest_version"`
@@ -35,20 +38,33 @@ type CustomPackage struct {
 }
 
 type GithubReleasePackage struct {
-	Name                string  `mapstructure:"name" yaml:"name" json:"name"`
-	Repo                string  `mapstructure:"repo" yaml:"repo" json:"repo"`
-	AssetPattern        string  `mapstructure:"asset_pattern" yaml:"asset_pattern" json:"asset_pattern"`
-	GetInstalledVersion Command `mapstructure:"get_installed_version" yaml:"get_installed_version" json:"get_installed_version"`
-	PostInstall         Command `mapstructure:"post_install" yaml:"post_install" json:"post_install"`
-	Remove              Command `mapstructure:"remove" yaml:"remove" json:"remove"`
+	Name                string   `mapstructure:"name" yaml:"name" json:"name"`
+	Executable          string   `mapstructure:"executable" yaml:"executable" json:"executable,omitempty"`
+	Repo                string   `mapstructure:"repo" yaml:"repo" json:"repo"`
+	AssetPattern        string   `mapstructure:"asset_pattern" yaml:"asset_pattern" json:"asset_pattern"`
+	GetInstalledVersion Command  `mapstructure:"get_installed_version" yaml:"get_installed_version" json:"get_installed_version"`
+	PostInstall         Command  `mapstructure:"post_install" yaml:"post_install" json:"post_install"`
+	Remove              Command  `mapstructure:"remove" yaml:"remove" json:"remove"`
 	DependsOn           []string `mapstructure:"depends_on" yaml:"depends_on" json:"depends_on,omitempty"`
 }
 
 type Config struct {
-	Sources               []Source              `mapstructure:"sources" yaml:"sources" json:"sources,omitempty"`
-	Packages              []Package             `mapstructure:"packages" yaml:"packages" json:"packages,omitempty"`
-	CustomPackages        []CustomPackage       `mapstructure:"custom_packages" yaml:"custom_packages" json:"custom_packages,omitempty"`
+	Sources               []Source               `mapstructure:"sources" yaml:"sources" json:"sources,omitempty"`
+	Packages              []Package              `mapstructure:"packages" yaml:"packages" json:"packages,omitempty"`
+	CustomPackages        []CustomPackage        `mapstructure:"custom_packages" yaml:"custom_packages" json:"custom_packages,omitempty"`
 	GithubReleasePackages []GithubReleasePackage `mapstructure:"github_release_packages" yaml:"github_release_packages" json:"github_release_packages,omitempty"`
+	ExecCacheTTL          string                 `mapstructure:"exec_cache_ttl" yaml:"exec_cache_ttl" json:"exec_cache_ttl,omitempty"`
+}
+
+func (c Config) ParsedExecCacheTTL() time.Duration {
+	if c.ExecCacheTTL == "" {
+		return 3 * time.Hour
+	}
+	d, err := time.ParseDuration(c.ExecCacheTTL)
+	if err != nil {
+		return 3 * time.Hour
+	}
+	return d
 }
 
 type Command struct {
