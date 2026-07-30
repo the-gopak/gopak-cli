@@ -1,4 +1,4 @@
-$schema: https://raw.githubusercontent.com/gopak/gopak-cli/HEAD/schema/gopak.schema.json
+$schema: https://raw.githubusercontent.com/the-gopak/gopak-cli/HEAD/schema/gopak.schema.json
 
 # Default popular package manager sources for gopak
 # You can copy snippets from here into your ~/.config/gopak/config.yaml

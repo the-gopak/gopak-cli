@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	schemaData "github.com/gopak/gopak-cli/schema"
+	schemaData "github.com/the-gopak/gopak-cli/schema"
 	"github.com/xeipuuv/gojsonschema"
 )
 

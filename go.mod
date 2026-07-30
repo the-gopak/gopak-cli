@@ -1,4 +1,4 @@
-module github.com/gopak/gopak-cli
+module github.com/the-gopak/gopak-cli
 
 go 1.25
 

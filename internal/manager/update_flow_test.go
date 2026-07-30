@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gopak/gopak-cli/internal/config"
+	"github.com/the-gopak/gopak-cli/internal/config"
 )
 
 func TestGroupTracked(t *testing.T) {

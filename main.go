@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/gopak/gopak-cli/cmd"
+	"github.com/the-gopak/gopak-cli/cmd"
 )
 
 func main() {

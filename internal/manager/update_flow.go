@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gopak/gopak-cli/internal/config"
-	"github.com/gopak/gopak-cli/internal/executil"
+	"github.com/the-gopak/gopak-cli/internal/config"
+	"github.com/the-gopak/gopak-cli/internal/executil"
 )
 
 type Operation string

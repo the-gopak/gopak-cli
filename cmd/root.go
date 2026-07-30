@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gopak/gopak-cli/internal/assets"
-	"github.com/gopak/gopak-cli/internal/config"
-	"github.com/gopak/gopak-cli/internal/logging"
+	"github.com/the-gopak/gopak-cli/internal/assets"
+	"github.com/the-gopak/gopak-cli/internal/config"
+	"github.com/the-gopak/gopak-cli/internal/logging"
 	"github.com/spf13/cobra"
 )
 

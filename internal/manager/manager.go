@@ -12,10 +12,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gopak/gopak-cli/internal/config"
-	"github.com/gopak/gopak-cli/internal/executil"
-	ghapi "github.com/gopak/gopak-cli/internal/github"
-	"github.com/gopak/gopak-cli/internal/logging"
+	"github.com/the-gopak/gopak-cli/internal/config"
+	"github.com/the-gopak/gopak-cli/internal/executil"
+	ghapi "github.com/the-gopak/gopak-cli/internal/github"
+	"github.com/the-gopak/gopak-cli/internal/logging"
 )
 
 type githubClient interface {

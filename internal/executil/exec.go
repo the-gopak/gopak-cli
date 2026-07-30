@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/gopak/gopak-cli/internal/config"
+	"github.com/the-gopak/gopak-cli/internal/config"
 )
 
 type Result struct {

@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/gopak/gopak-cli/internal/logging"
+	"github.com/the-gopak/gopak-cli/internal/logging"
 )
 
 // executableForPackage returns the binary and any pre-set arguments for the

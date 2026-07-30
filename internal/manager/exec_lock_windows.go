@@ -5,7 +5,7 @@ package manager
 import (
 	"os"
 
-	"github.com/gopak/gopak-cli/internal/logging"
+	"github.com/the-gopak/gopak-cli/internal/logging"
 	"golang.org/x/sys/windows"
 )
 

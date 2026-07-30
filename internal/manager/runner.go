@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gopak/gopak-cli/internal/config"
+	"github.com/the-gopak/gopak-cli/internal/config"
 )
 
 type Runner interface {

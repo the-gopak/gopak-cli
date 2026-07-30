@@ -1,5 +1,5 @@
 {
-  "$id": "https://raw.githubusercontent.com/gopak/gopak-cli/HEAD/schema/gopak.schema.json",
+  "$id": "https://raw.githubusercontent.com/the-gopak/gopak-cli/HEAD/schema/gopak.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Gopak configuration",
   "type": "object",

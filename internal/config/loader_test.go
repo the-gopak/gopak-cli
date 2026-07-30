@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gopak/gopak-cli/internal/assets"
+	"github.com/the-gopak/gopak-cli/internal/assets"
 	"gopkg.in/yaml.v3"
 )
 

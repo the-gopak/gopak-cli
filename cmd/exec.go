@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/gopak/gopak-cli/internal/config"
-	"github.com/gopak/gopak-cli/internal/manager"
+	"github.com/the-gopak/gopak-cli/internal/config"
+	"github.com/the-gopak/gopak-cli/internal/manager"
 	"github.com/spf13/cobra"
 )
 

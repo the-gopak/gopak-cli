@@ -6,7 +6,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/gopak/gopak-cli/internal/logging"
+	"github.com/the-gopak/gopak-cli/internal/logging"
 )
 
 func acquireExecLock(pkg string) (*os.File, error) {

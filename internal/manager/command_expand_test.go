@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gopak/gopak-cli/internal/config"
+	"github.com/the-gopak/gopak-cli/internal/config"
 )
 
 func TestExpandCommandForNames_PerPackage(t *testing.T) {

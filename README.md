@@ -13,7 +13,7 @@ Prerequisites: Go 1.25+
 Build from source:
 
 ```bash
-git clone https://github.com/gopak/gopak-cli.git
+git clone https://github.com/the-gopak/gopak-cli.git
 cd gopak-cli
 go build -o gopak
 # Binary: ./gopak
@@ -22,7 +22,7 @@ go build -o gopak
 Or install to `$GOBIN`:
 
 ```bash
-go install github.com/gopak/gopak-cli@latest
+go install github.com/the-gopak/gopak-cli@latest
 # Binary: $GOBIN/gopak-cli
 # Tip: you can symlink it as `gopak` if you prefer that name
 ```
@@ -139,7 +139,7 @@ Place your configuration files in the directory `~/.config/gopak/` (default). Yo
 On startup, `gopak` merges all `*.yaml` files in the config directory into one effective config. If a source name or a package name is duplicated across files (including between `packages` and `custom_packages`), the app exits with an error.
 
 Schema support:
-- The configuration schema is published at: `https://raw.githubusercontent.com/gopak/gopak-cli/HEAD/schema/gopak.schema.json`.
+- The configuration schema is published at: `https://raw.githubusercontent.com/the-gopak/gopak-cli/HEAD/schema/gopak.schema.json`.
 - The default sources file includes `$schema` for editor validation.
 - You can add the same `$schema` line to your `config.yaml` for IDE assistance.
 

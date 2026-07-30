@@ -1,7 +1,7 @@
 package console
 
 import (
-	"github.com/gopak/gopak-cli/internal/manager"
+	"github.com/the-gopak/gopak-cli/internal/manager"
 )
 
 // ConsoleUI renders and controls the interactive console update flow.

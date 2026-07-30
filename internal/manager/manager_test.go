@@ -3,7 +3,7 @@ package manager
 import (
 	"testing"
 
-	"github.com/gopak/gopak-cli/internal/config"
+	"github.com/the-gopak/gopak-cli/internal/config"
 )
 
 func TestRemoveUnknownPackage(t *testing.T) {

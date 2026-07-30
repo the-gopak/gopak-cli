@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	survey "github.com/AlecAivazis/survey/v2"
-	"github.com/gopak/gopak-cli/internal/manager"
+	"github.com/the-gopak/gopak-cli/internal/manager"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 )
