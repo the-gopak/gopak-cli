@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/gopak/gopak-cli/internal/config"
@@ -18,11 +19,16 @@ type Result struct {
 
 func RunShell(c config.Command) Result {
 	final := c.Command
-	if c.RequireRoot && os.Geteuid() != 0 {
+	if c.RequireRoot && runtime.GOOS != "windows" && os.Geteuid() != 0 {
 		esc := strings.ReplaceAll(c.Command, "'", "'\"'\"'")
 		final = fmt.Sprintf("sudo bash -ceu '%s'", esc)
 	}
-	cmd := exec.Command("bash", "-ceu", final)
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/C", final)
+	} else {
+		cmd = exec.Command("bash", "-ceu", final)
+	}
 	var out, errb bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &errb

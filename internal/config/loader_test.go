@@ -188,6 +188,26 @@ func TestEmbeddedDefaultSources_ValidYAMLAndSchema(t *testing.T) {
 	}
 }
 
+func TestLoadDefaultsAndFiles_AddsRuntimeSelfUpdatePackage(t *testing.T) {
+	cfg, err := LoadDefaultsAndFiles(nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, pkg := range cfg.GithubReleasePackages {
+		if pkg.Name != "gopak-cli" {
+			continue
+		}
+		if pkg.Repo != "the-gopak/gopak-cli" || pkg.AssetPattern == "" {
+			t.Fatalf("unexpected self-update package: %#v", pkg)
+		}
+		if pkg.GetInstalledVersion.Command == "" || pkg.PostInstall.Command == "" {
+			t.Fatalf("self-update package must detect and replace the running executable: %#v", pkg)
+		}
+		return
+	}
+	t.Fatal("runtime self-update package was not registered")
+}
+
 func TestLoadFromFiles_DuplicateSource(t *testing.T) {
 	dir := t.TempDir()
 	f1 := filepath.Join(dir, "a.yaml")

@@ -239,6 +239,8 @@ Tips for custom packages:
 
 Default sources are embedded into the binary and are always included as part of the effective config. You can copy entries you need into your own YAML files under `sources:`. The same catalog is available in the repository at `internal/assets/default-sources.yaml`.
 
+Gopak also registers itself at runtime as a GitHub-release package, without writing a config file. `gopak update` therefore checks the release matching the current desktop OS and CPU architecture, then replaces the running executable. On Windows, replacement is deferred until Gopak exits because Windows locks running executables.
+
 Included managers:
 - apt (Debian/Ubuntu)
 - dnf (Fedora/RHEL)

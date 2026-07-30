@@ -81,6 +81,10 @@ func LoadDefaultsAndFiles(defaultsYAML []byte, files []string) (Config, error) {
 	if err := ValidatePlaceholders(merged); err != nil {
 		return Config{}, err
 	}
+	merged, err := AddRuntimeDefaults(merged)
+	if err != nil {
+		return Config{}, err
+	}
 	current = merged
 	return merged, nil
 }

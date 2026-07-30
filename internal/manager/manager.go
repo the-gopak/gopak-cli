@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -542,9 +543,19 @@ func (m *Manager) installOrUpdateGithubRelease(gp config.GithubReleasePackage, i
 		return err
 	}
 	path = filepath.Clean(path)
-	cmd := config.Command{
-		Command:     fmt.Sprintf("latest_version=%q installed_version=%q asset_path=%q; %s", latest, installed, path, gp.PostInstall.Command),
-		RequireRoot: gp.PostInstall.RequireRoot,
+	return m.runCtx(gp.Name, "post_install", githubPostInstallCommand(gp, latest, installed, path))
+}
+
+func githubPostInstallCommand(gp config.GithubReleasePackage, latest, installed, assetPath string) config.Command {
+	cmd := gp.PostInstall
+	if runtime.GOOS == "windows" {
+		cmd.Command = fmt.Sprintf("set \"latest_version=%s\" && set \"installed_version=%s\" && set \"asset_path=%s\" && %s", cmdSetValue(latest), cmdSetValue(installed), cmdSetValue(assetPath), cmd.Command)
+		return cmd
 	}
-	return m.runCtx(gp.Name, "post_install", cmd)
+	cmd.Command = fmt.Sprintf("latest_version=%q installed_version=%q asset_path=%q; %s", latest, installed, assetPath, cmd.Command)
+	return cmd
+}
+
+func cmdSetValue(s string) string {
+	return strings.ReplaceAll(s, "\"", "\"\"")
 }

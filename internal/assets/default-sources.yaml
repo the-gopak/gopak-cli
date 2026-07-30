@@ -112,10 +112,10 @@ sources:
       command: "echo \"Please use https://pypi.org/search (via a browser).\""
       require_root: false
     get_installed_version:
-      command: "pipx runpip {package} show {package} | awk '/^Version:/\{print $2\}'"
+      command: "pipx runpip {package} show {package} | awk '/^Version:/{print $2}'"
       require_root: false
     get_latest_version:
-      command: "pipx runpip {package} index versions {package} | sed -n 's/.*(\(.*\)).*/\1/p'"
+      command: "pipx runpip {package} index versions {package} | sed -n 's/.*(\\(.*\\)).*/\\1/p'"
       require_root: false
 
   - type: package_manager

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -68,6 +69,15 @@ func (r *SudoRunner) ensureRootAccess(name, command string) bool {
 
 func (r *SudoRunner) Run(name, step string, cmd config.Command) error {
 	final := cmd.Command
+	if runtime.GOOS == "windows" {
+		bcmd := exec.Command("cmd", "/C", final)
+		bcmd.Stdout = os.Stdout
+		bcmd.Stderr = os.Stderr
+		if err := bcmd.Run(); err != nil {
+			return fmt.Errorf("command failed for %s [%s]", name, step)
+		}
+		return nil
+	}
 	if cmd.RequireRoot {
 		if !r.ensureRootAccess(name, cmd.Command) {
 			return fmt.Errorf("sudo auth not granted for %s [%s]", name, step)

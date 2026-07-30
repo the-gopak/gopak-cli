@@ -274,11 +274,7 @@ func (m *Manager) executeGithubWithRunner(gp config.GithubReleasePackage, op Ope
 	if err != nil {
 		return err
 	}
-	execCmd := config.Command{
-		Command:     fmt.Sprintf("latest_version=%q installed_version=%q asset_path=%q; %s", latest, installed, path, gp.PostInstall.Command),
-		RequireRoot: gp.PostInstall.RequireRoot,
-	}
-	return runner.Run(gp.Name, string(op), execCmd)
+	return runner.Run(gp.Name, string(op), githubPostInstallCommand(gp, latest, installed, path))
 }
 
 func (m *Manager) GetVersionInstalled(k PackageKey) string {
