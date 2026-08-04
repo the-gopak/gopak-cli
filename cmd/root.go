@@ -4,12 +4,13 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
+	"github.com/spf13/cobra"
 	"github.com/the-gopak/gopak-cli/internal/assets"
 	"github.com/the-gopak/gopak-cli/internal/config"
 	"github.com/the-gopak/gopak-cli/internal/logging"
-	"github.com/spf13/cobra"
 )
 
 var cfgFile string
@@ -24,6 +25,7 @@ var rootCmd = &cobra.Command{
 func Execute() error { return rootCmd.Execute() }
 
 func init() {
+	version = resolveVersion(version)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "path to any YAML file inside the config directory (default dir: ~/.config/gopak); all *.yaml in that directory are merged")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "show detailed steps and commands")
 	rootCmd.Version = version
@@ -69,4 +71,19 @@ func initConfig() {
 	}
 	logging.Init()
 	logging.SetVerbose(verbose)
+}
+
+func resolveVersion(linkerVersion string) string {
+	info, ok := debug.ReadBuildInfo()
+	return resolveVersionFromBuildInfo(linkerVersion, info, ok)
+}
+
+func resolveVersionFromBuildInfo(linkerVersion string, info *debug.BuildInfo, ok bool) string {
+	if linkerVersion != "dev" {
+		return linkerVersion
+	}
+	if ok && info != nil && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return "dev"
 }
